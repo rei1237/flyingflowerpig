@@ -24,8 +24,11 @@
   <link rel="apple-touch-icon" href="./앱 로고.png" />
   
   <title>날아라 꽃돼지!</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" as="image" href="./sky-day.jpg" />
   <link
-    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;700;900&family=Nanum+Pen+Script&family=DotGothic16&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Nanum+Pen+Script&display=swap"
     rel="stylesheet" />
   <style>
     *,
@@ -3230,6 +3233,299 @@
       margin-bottom: 8px;
     }
 
+
+    /* =================================================================
+       [업데이트] 연이 리뉴얼 — HUD · 난이도 선택 · 일시정지 · 결과 등급
+       ================================================================= */
+    :root {
+      --z-hud: 100;
+      --z-story: 150;
+      --z-overlay: 300;
+      --z-pause: 400;
+      --ink-plum: #2a1638;
+      --hud-chip: rgba(26, 14, 40, 0.62);
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --safe-top: env(safe-area-inset-top, 0px);
+    }
+
+    /* [성능] 캔버스 위에서 매 프레임 블러를 재계산하던 backdrop-filter 제거
+       (패널 배경은 이미 90% 이상 불투명 → 시각 차이 거의 없음) */
+    .glass-panel, #hud, #hud-altitude-wrap, .hud-alt-badge, .story-text,
+    .item-text-overlay, #ready-overlay, .item-indicator, #mult-badge,
+    #screen-gameover, #screen-gameover::before, .cyber-panel {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    #screen-gameover { background: rgba(8, 4, 18, 0.78); }
+    .story-text { background: rgba(30, 16, 46, 0.72); }
+    canvas { will-change: auto; }
+    .menu-character-wrap::before { filter: none; opacity: 0.55; }
+
+    /* ── HUD: 상단 중앙 점수 + 스테이지 진행 바 ── */
+    #game-wrap #hud {
+      top: calc(var(--safe-top) + 10px);
+      left: 50%; right: auto;
+      transform: translateX(-50%);
+      text-align: center;
+      background: none; border: 0; box-shadow: none;
+      padding: 0;
+      min-width: 160px;
+      z-index: var(--z-hud);
+    }
+    #game-wrap .hud-score {
+      font-size: 48px;
+      color: #fff;
+      letter-spacing: 1px;
+      text-shadow: 0 3px 0 rgba(120, 50, 100, 0.55), 0 0 18px rgba(30, 10, 40, 0.35);
+      transition: transform 0.18s var(--ease-out);
+    }
+    #game-wrap .hud-score.pop { animation: hudPop 0.28s var(--ease-out); }
+    @keyframes hudPop { 0% { transform: scale(1.22); } 100% { transform: scale(1); } }
+    .hud-meta {
+      display: flex; gap: 6px; justify-content: center; align-items: center;
+      margin-top: 6px;
+    }
+    #game-wrap .hud-level, .hud-mode {
+      margin: 0;
+      font-family: var(--font-ui);
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+      color: #fff;
+      background: var(--hud-chip);
+      border-radius: 999px;
+      padding: 3px 9px;
+      text-shadow: none;
+    }
+    .hud-progress {
+      width: 132px; height: 6px;
+      margin: 7px auto 0;
+      border-radius: 999px;
+      background: var(--hud-chip);
+      overflow: hidden;
+    }
+    #hud-progress-bar {
+      display: block; height: 100%; width: 100%;
+      transform-origin: left center;
+      transform: scaleX(0);
+      background: linear-gradient(90deg, #ffd6e0, #ff9db0 55%, #cda7e6);
+      border-radius: inherit;
+      transition: transform 0.35s var(--ease-out);
+    }
+    .hud-next {
+      margin-top: 4px;
+      font-family: var(--font-ui); font-size: 10px; font-weight: 500;
+      color: rgba(255, 255, 255, 0.92);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    }
+
+    /* 좌측 상단: 일시정지 + 고도 */
+    #game-wrap #hud-altitude-wrap {
+      top: calc(var(--safe-top) + 10px); left: 12px; right: 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      background: none; border: 0; box-shadow: none;
+      pointer-events: none;
+    }
+    #game-wrap .hud-alt-badge {
+      background: var(--hud-chip);
+      border: 0; box-shadow: none;
+      padding: 6px 11px; border-radius: 14px; gap: 1px;
+    }
+    #game-wrap .hud-alt-label { font-size: 9px; letter-spacing: 1px; color: #e3cdfb; }
+    #game-wrap .hud-alt-value { font-size: 18px; color: #fff; }
+    #game-wrap .hud-alt-unit { color: #e3cdfb; }
+    .hud-pause {
+      pointer-events: auto;
+      width: 44px; height: 44px;
+      display: grid; place-items: center;
+      border: 0; border-radius: 14px;
+      background: var(--hud-chip);
+      color: #fff; cursor: pointer;
+      transition: transform 0.15s var(--ease-out), background 0.15s;
+    }
+    .hud-pause:hover { background: rgba(60, 30, 80, 0.75); }
+    .hud-pause:active { transform: scale(0.92); }
+    .hud-pause:focus-visible, .mode-opt:focus-visible, .pause-btn:focus-visible, .menu-util-btn:focus-visible {
+      outline: 2px solid #ffd6e0; outline-offset: 2px;
+    }
+    #game-wrap #item-status { top: calc(var(--safe-top) + 132px); left: 12px; }
+    #game-wrap .story-overlay { top: calc(var(--safe-top) + 150px); }
+    .menu-util-btn { min-width: 0; white-space: nowrap; }
+    .menu-util-btn.btn-music::before { content: none !important; }
+    .menu-util-btn .util-label { overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 420px) {
+      .menu-util-row { gap: 6px; }
+      .menu-util-btn { padding-left: 6px !important; padding-right: 6px !important; font-size: 12px !important; gap: 4px !important; }
+    }
+    @media (max-height: 820px) {
+      #game-wrap .menu-character-wrap { width: 108px; height: 108px; }
+      #game-wrap .menu-character-img { width: 100px; height: 100px; }
+    }
+    #game-wrap #mult-badge { top: calc(var(--safe-top) + 112px); right: 12px; }
+    .item-indicator .timer-bar { width: 100% !important; transform-origin: left center; will-change: transform; }
+
+    /* READY 화면 */
+    #game-wrap #ready-overlay { background: rgba(20, 8, 30, 0.22); justify-content: flex-end; padding-bottom: 24vh; }
+    .ready-mode {
+      margin-top: 18px;
+      font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+      color: #fff;
+      background: rgba(26, 14, 40, 0.7);
+      padding: 6px 14px; border-radius: 999px;
+    }
+    .ready-tip {
+      margin-top: 10px; max-width: 280px; text-align: center;
+      font-family: var(--font-ui); font-size: 13px; line-height: 1.5;
+      color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    }
+    #game-wrap .ready-subtext { color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
+
+    /* ── 메뉴: 난이도 선택 ── */
+    .mode-section { width: 100%; margin: 4px 0 12px; text-align: left; }
+    .mode-section-label {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+      color: #f3e8ff; margin: 0 2px 7px;
+    }
+    .mode-section-label small { font-weight: 500; font-size: 11px; color: #cdb8e6; }
+    .mode-picker {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    }
+    .mode-opt {
+      position: relative;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      min-height: 64px;
+      padding: 8px 2px 7px;
+      border-radius: 14px;
+      border: 1.5px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: #efe4ff;
+      font-family: var(--font-ui);
+      cursor: pointer;
+      transition: transform 0.18s var(--ease-out), background 0.18s, border-color 0.18s;
+    }
+    .mode-opt:hover { background: rgba(255, 255, 255, 0.08); }
+    .mode-opt:active { transform: scale(0.95); }
+    .mode-opt.selected {
+      border-color: var(--mode);
+      background: color-mix(in srgb, var(--mode) 18%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--mode) 18%, transparent);
+    }
+    .mode-opt.locked { opacity: 0.55; }
+    .mode-emoji { font-size: 20px; line-height: 1.1; }
+    .mode-name { font-size: 12px; font-weight: 700; }
+    .mode-rank {
+      font-family: var(--font-game); font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+      color: var(--mode);
+    }
+    .mode-detail {
+      margin-top: 8px; min-height: 42px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      font-family: var(--font-ui); font-size: 12px; line-height: 1.5;
+      color: #e9dcf7;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .mode-detail strong { color: #fff; }
+    .mode-detail-best { color: #cdb8e6; font-size: 11px; }
+    .mode-detail-lock { color: #ffd6a8; }
+    .mode-detail.flash { animation: detailShake 0.36s var(--ease-out); }
+    @keyframes detailShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    .btn-start-cta { flex-wrap: wrap; }
+    .btn-start-sub {
+      flex-basis: 100%;
+      font-family: var(--font-ui); font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+      opacity: 0.85; margin-top: -2px;
+    }
+
+
+    /* ── 일시정지 ── */
+    #screen-pause {
+      z-index: var(--z-pause);
+      background: rgba(12, 6, 22, 0.62);
+      transition: opacity 0.2s var(--ease-out);
+    }
+    .pause-panel {
+      width: min(300px, 86%);
+      padding: 24px 20px 18px;
+      border-radius: 24px;
+      background: #1d1030;
+      border: 1px solid rgba(255, 214, 224, 0.16);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+      text-align: center;
+      color: #fff;
+      font-family: var(--font-ui);
+      animation: pauseIn 0.28s var(--ease-out);
+    }
+    @keyframes pauseIn { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: none; } }
+    .pause-title { font-size: 22px; font-weight: 900; }
+    .pause-sub { margin: 6px 0 18px; font-size: 13px; color: #dcc8f2; }
+    .pause-btn {
+      display: block; width: 100%;
+      min-height: 48px; margin-top: 8px;
+      border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff; font-family: var(--font-ui); font-size: 15px; font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s var(--ease-out), background 0.15s;
+    }
+    .pause-btn:hover { background: rgba(255, 255, 255, 0.12); }
+    .pause-btn:active { transform: scale(0.97); }
+    .pause-btn.primary { background: linear-gradient(135deg, #ff8fb4, #b592de); border: 0; color: #2a1638; }
+    .pause-hint { margin-top: 14px; font-size: 11px; color: #b9a6cf; }
+    .countdown {
+      font-family: var(--font-game); font-size: 96px; font-weight: 900;
+      color: #fff; text-shadow: 0 6px 0 rgba(181, 146, 222, 0.6), 0 0 30px rgba(255, 157, 176, 0.5);
+    }
+    .countdown.tick { animation: countTick 0.55s var(--ease-out); }
+    @keyframes countTick { 0% { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+    /* ── 결과: 등급 카드 ── */
+    .go-rank {
+      display: flex; align-items: center; gap: 14px;
+      margin: 14px auto 4px;
+      padding: 12px 16px;
+      max-width: 320px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: left;
+    }
+    .go-rank-grade {
+      --rank: #ff9db0;
+      flex: none;
+      width: 64px; height: 64px;
+      display: grid; place-items: center;
+      border-radius: 18px;
+      font-family: var(--font-game); font-weight: 900; font-size: 30px; letter-spacing: -1px;
+      color: #1d1030;
+      background: var(--rank);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--rank) 25%, transparent), 0 8px 22px color-mix(in srgb, var(--rank) 35%, transparent);
+    }
+    .go-rank-grade.stamp { animation: rankStamp 0.6s var(--ease-out) 0.5s both; }
+    @keyframes rankStamp { 0% { transform: scale(2.2) rotate(-12deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+    .go-rank-title { font-family: var(--font-ui); font-size: 17px; font-weight: 900; color: #fff; }
+    .go-rank-sub { font-family: var(--font-ui); font-size: 12px; color: #d5c2ec; margin-top: 3px; line-height: 1.45; }
+    .go-unlock {
+      margin: 8px auto 0; max-width: 320px;
+      padding: 8px 12px; border-radius: 12px;
+      font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+      color: #2a1638; background: #ffd36b;
+      animation: pauseIn 0.4s var(--ease-out) 0.9s both;
+    }
+    #screen-gameover .cyber-stats-container { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+    @media (max-width: 360px) {
+      .mode-name { font-size: 11px; }
+      .mode-opt { min-height: 58px; }
+      #game-wrap .hud-score { font-size: 40px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .mode-opt, .pause-btn, .hud-pause, #hud-progress-bar { transition: none; }
+      .pause-panel, .go-unlock, .go-rank-grade.stamp, .countdown.tick, #game-wrap .hud-score.pop, .mode-detail.flash { animation: none; }
+      .menu-character-wrap::before, .menu-character-wrap::after, .menu-character-img, .ready-text, #mult-badge, .story-overlay, .story-emoji { animation: none !important; }
+      .story-overlay { opacity: 1; }
+    }
+
 </style>
 
 <body>
@@ -3247,6 +3543,8 @@
     <div class="hidden" id="ready-overlay">
       <div class="ready-text">READY</div>
       <div class="ready-subtext">준비되면 클릭/탭으로 출발!</div>
+      <div class="ready-mode" id="ready-mode">🌸 꽃잎 모드</div>
+      <div class="ready-tip" id="ready-tip"></div>
     </div>
 
     <!-- [신규] 배속 컨트롤 (무적 모드용) -->
@@ -3256,8 +3554,11 @@
       <button class="speed-btn" id="btn-fast">+</button>
     </div>
 
-    <!-- Altitude HUD -->
-    <div id="hud-altitude-wrap" class="hidden" style="display:none !important">
+    <!-- 좌측 상단: 일시정지 + 고도 -->
+    <div id="hud-altitude-wrap" class="hidden">
+      <button class="hud-pause" id="btn-pause" type="button" aria-label="일시정지 (P)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg>
+      </button>
       <div class="hud-alt-badge">
         <div class="hud-alt-label">🚀 고도</div>
         <div class="hud-alt-number">
@@ -3267,14 +3568,18 @@
       </div>
     </div>
 
-    <!-- Score HUD -->
-    <div id="hud" class="hidden" style="display:none !important">
-      <div class="hud-label">✨ 행운 점수 충전율</div>
-      <div class="hud-score" id="hud-score">0</div>
-      <div class="hud-level" id="hud-level">LEVEL 1</div>
-      <!-- [신규] 무적 모드용 메뉴 버튼 -->
+    <!-- 상단 중앙: 점수 + 스테이지 진행 -->
+    <div id="hud" class="hidden">
+      <div class="hud-score" id="hud-score" aria-live="off">0%</div>
+      <div class="hud-meta">
+        <span class="hud-level" id="hud-level">LEVEL 1</span>
+        <span class="hud-mode" id="hud-mode">🌸 꽃잎</span>
+      </div>
+      <div class="hud-progress" aria-hidden="true"><i id="hud-progress-bar"></i></div>
+      <div class="hud-next" id="hud-next">다음 스테이지까지 50</div>
+      <!-- 무적 모드용 메뉴 버튼 -->
       <button class="btn-hud-menu hidden" id="btn-hud-menu">🏠 메뉴</button>
-      <!-- [신규] 무적 모드 해제 버튼 -->
+      <!-- 무적 모드 해제 버튼 -->
       <button class="btn-godmode-off hidden" id="btn-godmode-off">👼 무적 모드 해제</button>
     </div>
 
@@ -3339,12 +3644,20 @@
           </div>
           <div class="menu-tagline">어둠의 액운을 피해<br>아름다운 <strong>우주</strong>를 향한 연이의 여정 🌸✨</div>
 
+          <!-- ── 난이도 선택 ── -->
+          <div class="mode-section">
+            <div class="mode-section-label"><span>난이도</span><small>어려울수록 높은 등급!</small></div>
+            <div class="mode-picker" id="mode-picker" role="radiogroup" aria-label="난이도 선택"></div>
+            <div class="mode-detail" id="mode-detail" aria-live="polite"></div>
+          </div>
+
           <!-- ── PRIMARY CTA ── -->
           <button class="btn btn-primary btn-start-cta" id="btn-start">
             <span class="btn-start-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v14l11-7-11-7z"/></svg>
             </span>
             <span class="btn-start-label">여정 시작</span>
+            <span class="btn-start-sub" id="btn-start-sub">🌸 꽃잎 모드</span>
             <span class="btn-start-shimmer"></span>
           </button>
 
@@ -3354,6 +3667,7 @@
             <span class="hint-dot">·</span>
             <span class="hint-chip">CLICK</span>
             <span class="hint-dot">·</span>
+            <span class="hint-chip">P 일시정지</span>
           </div>
 
           <!-- ── UTILITY ROW: 음악 + 가이드 ── -->
@@ -3361,6 +3675,10 @@
             <button class="menu-util-btn btn-music" id="btn-music">
               <span class="util-icon">🎵</span>
               <span class="util-label">음악</span>
+            </button>
+            <button class="menu-util-btn" id="btn-quality" type="button">
+              <span class="util-icon">✨</span>
+              <span class="util-label">화질 자동</span>
             </button>
             <button class="menu-util-btn btn-manual-toggle" id="btn-manual-toggle">
               <span class="util-icon">📖</span>
@@ -3389,6 +3707,12 @@
               <div class="manual-item manual-warning"><strong>액운의 기둥</strong> · <strong>심연의 돌기둥</strong>: 즉사</div>
               <div class="manual-item manual-warning"><strong>어둠의 오오라</strong>: 중독, 행운 저하</div>
             </div>
+            <div class="manual-section">
+              <div class="manual-title">🏅 난이도 & 등급</div>
+              <div class="manual-item"><strong>🌱 새싹</strong> → <strong>🌸 꽃잎</strong> → <strong>🔥 열정</strong> → <strong>👑 전설</strong></div>
+              <div class="manual-item">열정: 꽃잎 50점(또는 새싹 100점) · 전설: 열정 100점으로 해금</div>
+              <div class="manual-item">등급 D 씨앗 ~ SSS 우주 꽃돼지 (어려운 모드일수록 가산)</div>
+            </div>
             <div class="manual-section manual-cheer">
               <div class="manual-cheer-text">연이의 꿈을 응원해주세요! 💕</div>
             </div>
@@ -3399,7 +3723,7 @@
             <div class="best-score-row">
               <span class="best-score-icon">🏆</span>
               <div class="best-score-info">
-                <div class="best-score-label">최고 행운 충전율</div>
+                <div class="best-score-label">최고 행운 충전율 · <span id="menu-best-mode">🌸 꽃잎</span></div>
                 <div class="best-score-value" id="menu-best">0</div>
               </div>
             </div>
@@ -3441,6 +3765,19 @@
       </div>
     </div>
 
+    <!-- 일시정지 -->
+    <div class="overlay hidden" id="screen-pause" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="pause-panel" id="pause-panel">
+        <div class="pause-title" id="pause-title">잠깐 쉬어가요 🐷</div>
+        <div class="pause-sub" id="pause-sub">🌸 꽃잎 · LEVEL 1 · 0%</div>
+        <button class="pause-btn primary" id="btn-resume" type="button">▶ 계속하기</button>
+        <button class="pause-btn" id="btn-pause-restart" type="button">🔄 처음부터</button>
+        <button class="pause-btn" id="btn-pause-menu" type="button">🏠 메인 메뉴</button>
+        <div class="pause-hint">P · ESC 키로 일시정지 / 재개</div>
+      </div>
+      <div class="countdown hidden" id="countdown" aria-live="assertive">3</div>
+    </div>
+
       <!-- Game Over (Cyberpunk Premium Version) -->
       <div class="overlay hidden" id="screen-gameover">
       <div class="cyber-panel">
@@ -3460,6 +3797,14 @@
             <div class="score-display-cyber" id="go-score">0%</div>
           </div>
           <div class="new-record-badge-cyber" id="new-record-badge">✨ NEW RECORD ✨</div>
+          <div class="go-rank" id="go-rank">
+            <div class="go-rank-grade" id="go-rank-grade">D</div>
+            <div class="go-rank-info">
+              <div class="go-rank-title" id="go-rank-title">씨앗</div>
+              <div class="go-rank-sub" id="go-rank-sub">-</div>
+            </div>
+          </div>
+          <div class="go-unlock hidden" id="go-unlock"></div>
         </div>
 
         <div class="cyber-fortune-card">
@@ -3500,11 +3845,15 @@
             <div class="cyber-stat-label">LEVEL</div>
             <div class="cyber-led-cyan" id="go-level">1</div>
           </div>
+          <div class="cyber-stat-box">
+            <div class="cyber-stat-label">BEST</div>
+            <div class="cyber-led-cyan" id="go-best">0%</div>
+          </div>
         </div>
 
         <div class="go-buttons-cyber">
           <button class="cyber-btn-primary" id="btn-restart">
-            <span class="cyber-icon-spin">↻</span> 다시 도전하기
+            <span class="cyber-icon-spin">↻</span> 다시 도전하기 <small style="opacity:.7;font-size:.75em">(Enter)</small>
           </button>
           <button class="cyber-btn-secondary" id="btn-menu">
             🏠 메인 메뉴로
@@ -3524,28 +3873,32 @@
 
     // ── 기준 해상도 ──
     const BASE_W = 480;
-    const BASE_H = 720;
+    let BASE_H = 720;      // [개선] 세로 화면에서는 화면 비율에 맞춰 늘어남 (720~1040)
     const GROUND_H = 90;   // 바닥 높이 (더 두껍게)
 
     // ── 성능 최적화 설정 (resizeCanvas에서 isMobile 설정 후 사용) ──
     let isLowEnd = false;
+    // [신규] 그래픽 품질 설정: auto(자동) / high(고화질) / saver(절전)
+    let qualitySetting = (() => { try { return localStorage.getItem('pig_quality') || 'auto'; } catch (e) { return 'auto'; } })();
     let PERF_CONFIG = {
-      shadows: true, particles: 0.5, auraSmokes: 1, groundDecor: 0.6, frameSkip: 1,
+      particles: 0.5, auraSmokes: 1, groundDecor: 0.6, frameSkip: 1, maxDpr: 2,
       butterflyCount: 3, lightParticleCount: 8, starCount: 50, nebulaCount: 2
     };
     function updatePerfConfig() {
-      // [최적화] 저사양 기준 강화
-      isLowEnd = isMobile && (navigator.hardwareConcurrency <= 4 || /Android 4|Android 5|iPhone 6|iPhone 7|iPhone 8|iPhone X/i.test(navigator.userAgent));
+      const autoLow = isMobile && ((navigator.hardwareConcurrency || 4) <= 4 || /Android [4-7]\b|iPhone OS (9|10|11|12)_/i.test(navigator.userAgent));
+      isLowEnd = qualitySetting === 'saver' || (qualitySetting === 'auto' && autoLow);
+      const mob = isMobile && qualitySetting !== 'high';
+      // canvas shadowBlur 는 전면 제거 → 미리 구워둔 글로우 스프라이트 사용 (모바일 버벅임 주원인)
       PERF_CONFIG = {
-        shadows: !isLowEnd && !isMobile,  // 모바일에서는 그림자 비활성화
-        particles: isLowEnd ? 0.10 : (isMobile ? 0.20 : 0.5),  // 입자 수 대폭 감소
-        auraSmokes: isLowEnd ? 0 : (isMobile ? 0.4 : 1),  // 오오라 연기 최소화
-        groundDecor: isLowEnd ? 0.10 : (isMobile ? 0.20 : 0.6),  // 바닥 장식 감소
-        frameSkip: isLowEnd ? 2 : 1,
-        butterflyCount: isLowEnd ? 0 : (isMobile ? 1 : 3),
-        lightParticleCount: isLowEnd ? 1 : (isMobile ? 3 : 8),  // 빛 입자 대폭 감소
-        starCount: isLowEnd ? 15 : (isMobile ? 25 : 50),  // 별 개수 감소
-        nebulaCount: isLowEnd ? 0 : (isMobile ? 1 : 2)
+        particles: isLowEnd ? 0.25 : (mob ? 0.5 : 1),
+        auraSmokes: isLowEnd ? 0 : (mob ? 0.5 : 1),
+        groundDecor: isLowEnd ? 0.35 : (mob ? 0.6 : 0.8),
+        frameSkip: qualitySetting === 'saver' ? 2 : 1,
+        maxDpr: qualitySetting === 'saver' ? 1 : (isLowEnd ? 1 : (qualitySetting === 'high' ? 3 : 2)),
+        butterflyCount: isLowEnd ? 0 : (mob ? 2 : 3),
+        lightParticleCount: isLowEnd ? 2 : (mob ? 5 : 8),
+        starCount: isLowEnd ? 20 : (mob ? 35 : 55),
+        nebulaCount: isLowEnd ? 1 : 2
       };
     }
 
@@ -3565,7 +3918,7 @@
     const PIPE_INTERVALS = [1800, 1500, 1200, 950, 800, 700, 650, 600];
     function getPipeInterval() {
       // [수정] 레벨 5+는 점점 더 짧아짐 (최소 600ms)
-      return PIPE_INTERVALS[Math.min(level - 1, 7)];
+      return PIPE_INTERVALS[Math.min(level - 1, 7)] * DIFF.intervalScale;
     }
 
     // ── 레벨 임계 ──
@@ -3583,13 +3936,89 @@
     const PIPE_HIT_SCALE = 0.95; // [수정] 파이프 95% 크기 (더 엄격하게, 0.75 → 0.95)
     const AURA_HIT_SCALE = 0.35; // 오오라 기존 유지
 
+    /* ================================================================
+       [신규] 난이도 모드 체계 — 새싹 / 꽃잎 / 열정 / 전설
+       · 물리(중력·점프), 기둥 틈·속도·간격, 움직이는 기둥 비율,
+         오오라 등장 레벨, 아이템 빈도, 시작 보호막, 피격 판정을 모드별로 조정
+       · rankWeight: 결과 등급 계산 시 점수 가중치 (어려울수록 높은 등급)
+       ================================================================ */
+    const DIFFICULTIES = {
+      sprout: {
+        id: 'sprout', name: '새싹', emoji: '🌱', tag: 'EASY', color: '#8fe3b0',
+        desc: '천천히 떨어지고 틈이 넓어요. 처음이라면 여기서!',
+        gravity: 0.34, jump: -7.4, maxFall: 9, gapScale: 1.16, speedScale: 0.86, intervalScale: 1.12,
+        moveScale: 0.5, auraFrom: 99, itemRate: 0.42, lotusBonus: 2.5, shieldMs: 8000, hitPad: 0.29, rankWeight: 0.6
+      },
+      petal: {
+        id: 'petal', name: '꽃잎', emoji: '🌸', tag: 'NORMAL', color: '#ff9db0',
+        desc: '기본 여정. 우주에서 어둠의 오오라가 나타나요.',
+        gravity: 0.40, jump: -8.0, maxFall: 10, gapScale: 1, speedScale: 1, intervalScale: 1,
+        moveScale: 1, auraFrom: 4, itemRate: 0.32, lotusBonus: 1, shieldMs: 5000, hitPad: 0.25, rankWeight: 1.0
+      },
+      blaze: {
+        id: 'blaze', name: '열정', emoji: '🔥', tag: 'HARD', color: '#ffb067',
+        desc: '빠르고 좁은 틈. 성층권부터 오오라가 몰려와요.',
+        gravity: 0.44, jump: -8.4, maxFall: 11, gapScale: 0.9, speedScale: 1.12, intervalScale: 0.93,
+        moveScale: 1.3, auraFrom: 3, itemRate: 0.26, lotusBonus: 0.6, shieldMs: 2500, hitPad: 0.22, rankWeight: 1.4
+      },
+      legend: {
+        id: 'legend', name: '전설', emoji: '👑', tag: 'LEGEND', color: '#c9a2ff',
+        desc: '보호막 없이 시작. 구름 위부터 오오라, 거의 모든 기둥이 움직여요.',
+        gravity: 0.47, jump: -8.8, maxFall: 12, gapScale: 0.8, speedScale: 1.24, intervalScale: 0.87,
+        moveScale: 1.6, auraFrom: 2, itemRate: 0.2, lotusBonus: 0.3, shieldMs: 0, hitPad: 0.2, rankWeight: 1.8
+      }
+    };
+    const DIFF_ORDER = ['sprout', 'petal', 'blaze', 'legend'];
+
+    // ── 결과 등급 (점수 × 모드 가중치 = 등급 포인트) ──
+    const RANKS = [
+      { min: 400, grade: 'SSS', title: '우주 꽃돼지', color: '#ffe27a' },
+      { min: 280, grade: 'SS', title: '별빛 꽃돼지', color: '#ffc4ec' },
+      { min: 180, grade: 'S', title: '황금 연꽃', color: '#ffd36b' },
+      { min: 100, grade: 'A', title: '만개한 꽃', color: '#ff9db0' },
+      { min: 50, grade: 'B', title: '꽃봉오리', color: '#c9a2ff' },
+      { min: 20, grade: 'C', title: '새싹', color: '#8fe3b0' },
+      { min: 0, grade: 'D', title: '씨앗', color: '#b9b2c9' }
+    ];
+    function getRank(sc, diffId) {
+      const pts = Math.round(sc * (DIFFICULTIES[diffId] || DIFFICULTIES.petal).rankWeight);
+      const idx = RANKS.findIndex(r => pts >= r.min);
+      const rank = RANKS[idx];
+      const next = idx > 0 ? RANKS[idx - 1] : null;
+      return { ...rank, points: pts, next, toNext: next ? next.min - pts : 0 };
+    }
+
+    // ── 모드별 기록 저장 (기존 pig_best 는 '꽃잎' 기록으로 이관) ──
+    const store = {
+      get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+      set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+    };
+    let modeBests = (() => {
+      let o = {};
+      try { o = JSON.parse(store.get('pig_best_modes', '{}')) || {}; } catch (e) { o = {}; }
+      DIFF_ORDER.forEach(id => { o[id] = Math.max(0, parseInt(o[id] || 0, 10) || 0); });
+      const legacy = parseInt(store.get('pig_best', '0'), 10) || 0;
+      if (legacy > o.petal) o.petal = legacy;
+      return o;
+    })();
+    function saveModeBests() { store.set('pig_best_modes', JSON.stringify(modeBests)); }
+
+    let currentDiffId = DIFFICULTIES[store.get('pig_difficulty', 'petal')] ? store.get('pig_difficulty', 'petal') : 'petal';
+    let DIFF = DIFFICULTIES[currentDiffId];
+
+    // 해금 조건: 열정 ← 꽃잎 50점(구름 도달) 또는 새싹 100점 / 전설 ← 열정 100점
+    const UNLOCK_RULES = {
+      blaze: { check: () => modeBests.petal >= 50 || modeBests.sprout >= 100, hint: '꽃잎 50점 또는 새싹 100점' },
+      legend: { check: () => modeBests.blaze >= 100, hint: '열정 100점' }
+    };
+    function isUnlocked(id) {
+      if (godModeActive) return true;
+      const rule = UNLOCK_RULES[id];
+      return !rule || rule.check();
+    }
+
     // ── 에셋 로드 (상대 경로 - GitHub Pages 호환) ──
-    const pigSprite = new Image();
-    pigSprite.src = './pig-main.png';
-    const pigWink = new Image();
-    pigWink.src = './pig-wink.png';
-    const pigCrash = new Image();
-    pigCrash.src = './pig-crash.png';
+    // [개선] 돼지 PNG 스프라이트(약 760KB) 대신 캐릭터 시트 기반 벡터 렌더러(Yeoni) 사용
     const bgImages = { 1: new Image(), 2: new Image(), 3: new Image(), 4: new Image() };
     bgImages[1].src = './sky-day.jpg';
     bgImages[2].src = './sky-sunset.jpg';
@@ -3597,10 +4026,113 @@
     bgImages[4].src = './sky-space.jpg';
     const BGM_URL = './freepik-growth-groove.mp3';
 
-    // ── 스프라이트 설정 ──
+    const CRASH_DURATION = 2000;
+
+    /* ================================================================
+       PIG SPRITE — 기존 꽃돼지 일러스트(pig-main 4x4 시트 / 윙크 / 충돌)
+       [성능] 기존: 매 프레임 타원 클리핑 + 스무딩 끔(계단 현상) 상태로 원본 시트에서 잘라 그림
+              개선: 각 프레임을 한 번만 고품질로 잘라 오프스크린 캔버스에 캐시 → drawImage 1회
+       ================================================================ */
+    const pigSprite = new Image(); pigSprite.src = './pig-main.png';
+    const pigWink = new Image(); pigWink.src = './pig-wink.png';
+    const pigCrash = new Image(); pigCrash.src = './pig-crash.png';
     const SPRITE_COLS = 4, SPRITE_ROWS = 4, TOTAL_FRAMES = 16;
     const ANIM_SEQ = [0, 1, 2, 3, 7, 6, 5, 4, 8, 9, 10, 11, 15, 14, 13, 12];
-    const CRASH_DURATION = 2000;
+    const Yeoni = (() => {
+      const W = 70, H = 70 / 1.15;          // 기존 표준 비율 (가로:세로 = 1.15:1)
+      let R = 0, frames = [], wink = null, crash = null;
+      function cut(img, sx, sy, sw, sh) {
+        const c = document.createElement('canvas');
+        c.width = Math.ceil(W * R); c.height = Math.ceil(H * R);
+        const x = c.getContext('2d');
+        x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+        x.beginPath();
+        x.ellipse(c.width / 2, c.height / 2, c.width * 0.48 - 1, c.height * 0.45 - 1, 0, 0, Math.PI * 2);
+        x.clip();
+        x.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+        return c;
+      }
+      function ready(img) { return img.complete && img.naturalWidth > 0; }
+      function ensure() {
+        if (!frames.length && ready(pigSprite)) {
+          const sw = pigSprite.naturalWidth / SPRITE_COLS, sh = pigSprite.naturalHeight / SPRITE_ROWS, b = 2;
+          for (let f = 0; f < TOTAL_FRAMES; f++) {
+            frames.push(cut(pigSprite, (f % SPRITE_COLS) * sw + b, Math.floor(f / SPRITE_COLS) * sh + b, sw - b * 2, sh - b * 2));
+          }
+        }
+        if (!wink && ready(pigWink)) wink = cut(pigWink, 0, 0, pigWink.naturalWidth, pigWink.naturalHeight);
+        if (!crash && ready(pigCrash)) crash = cut(pigCrash, 0, 0, pigCrash.naturalWidth, pigCrash.naturalHeight);
+      }
+      function build(res) { R = Math.max(1, Math.min(4, res)); frames = []; wink = null; crash = null; }
+      /** size: 66 = 게임 내 기본 크기(가로 70px) */
+      function draw(ctx, x, y, size, rot, ex, frame, alpha) {
+        if (!R) build(2);
+        ensure();
+        let img = null;
+        if (ex === 'hurt') img = crash;
+        else if (ex === 'wink' || ex === 'love') img = wink;
+        if (!img && frames.length) img = frames[ANIM_SEQ[((Math.floor(frame / 2) % TOTAL_FRAMES) + TOTAL_FRAMES) % TOTAL_FRAMES]];
+        const w = W * size / 66, h = H * size / 66;
+        ctx.save();
+        ctx.translate(x, y);
+        if (rot) ctx.rotate(rot);
+        if (alpha !== undefined && alpha < 1) ctx.globalAlpha = alpha;
+        if (img) ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        else {
+          ctx.fillStyle = '#ffb6c1'; ctx.strokeStyle = '#ff69b4'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(0, 0, w * 0.5, h * 0.45, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      return { build, draw };
+    })();
+
+    /* ================================================================
+       [성능] 렌더 캐시 — 글로우 스프라이트 / 지면 스트립 / 기둥 조각
+       · shadowBlur·createRadialGradient 를 매 프레임 호출하던 부분을
+         한 번 그려둔 오프스크린 캔버스의 drawImage 로 대체
+       ================================================================ */
+    const _glowCache = new Map();
+    function makeCanvas(w, h) {
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h));
+      return c;
+    }
+    function glowSprite(key, stops) {
+      let c = _glowCache.get(key);
+      if (c) return c;
+      const px = 128;
+      c = makeCanvas(px, px);
+      const x = c.getContext('2d');
+      const g = x.createRadialGradient(px / 2, px / 2, 0, px / 2, px / 2, px / 2);
+      for (let i = 0; i < stops.length; i++) g.addColorStop(stops[i][0], stops[i][1]);
+      x.fillStyle = g; x.fillRect(0, 0, px, px);
+      _glowCache.set(key, c);
+      return c;
+    }
+    function drawGlow(key, stops, x, y, r, alpha) {
+      if (alpha <= 0) return;
+      const c = glowSprite(key, stops);
+      const pa = ctx.globalAlpha;
+      ctx.globalAlpha = pa * Math.min(1, alpha);
+      ctx.drawImage(c, x - r, y - r, r * 2, r * 2);
+      ctx.globalAlpha = pa;
+    }
+    const GLOW = {
+      gold: [[0, 'rgba(255,230,140,0.0)'], [0.55, 'rgba(255,215,0,0.45)'], [0.8, 'rgba(255,190,90,0.22)'], [1, 'rgba(255,180,80,0)']],
+      angel: [[0, 'rgba(255,215,0,0.1)'], [0.5, 'rgba(255,180,60,0.35)'], [1, 'rgba(255,100,100,0)']],
+      cyan: [[0, 'rgba(74,240,240,0)'], [0.6, 'rgba(74,240,240,0.28)'], [1, 'rgba(74,240,240,0)']],
+      green: [[0, 'rgba(127,255,127,0)'], [0.65, 'rgba(127,255,127,0.22)'], [1, 'rgba(127,255,127,0)']],
+      auraDark: [[0, 'rgba(180,140,220,0.65)'], [0.7, 'rgba(140,100,180,0.4)'], [1, 'rgba(140,100,180,0)']],
+      auraChaos: [[0, 'rgba(255,100,150,0.6)'], [0.6, 'rgba(220,80,120,0.35)'], [1, 'rgba(220,80,120,0)']],
+      nebulaBig: [[0, 'rgba(100,0,160,0.08)'], [1, 'rgba(100,0,160,0)']],
+      soft: [[0, 'rgba(255,255,255,0.9)'], [0.35, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']]
+    };
+
+    // 해상도 의존 캐시는 리사이즈 시 무효화
+    let _renderCacheGen = 0;
+    function invalidateRenderCaches() { _renderCacheGen++; }
+    function cacheRes() { return Math.max(1, Math.min(3, scale * dpr)); }
 
     // ── BGM (개선된 버전) ──
     let bgmAudio = null, bgmMuted = false, bgmLoaded = false;
@@ -3744,8 +4276,10 @@
     let dpr = 1;       // Device Pixel Ratio (Retina 지원)
     let isMobile = false;
 
+    let _yeoniRes = 0;
     function resizeCanvas() {
-      isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
       updatePerfConfig();
 
       const wrap = document.getElementById('game-wrap');
@@ -3753,36 +4287,35 @@
       const availH = wrap.clientHeight || window.innerHeight;
       const isLandscape = availW > availH;
 
+      // [개선] 세로 화면은 논리 높이를 화면 비율에 맞춰 늘림 → 위아래 검은 여백 제거
+      const targetH = isLandscape ? 720 : Math.round(Math.max(720, Math.min(1040, BASE_W * availH / availW)));
+      if (targetH !== BASE_H) {
+        BASE_H = targetH;
+        try { if (bird && isFinite(bird.y)) { bird.baseY = BASE_H * 0.44; bird.y = Math.min(bird.y, BASE_H - GROUND_H - 40); } } catch (e) { }
+      }
+
       scale = Math.min(availW / BASE_W, availH / BASE_H);
       if (isMobile && isLandscape && availW < 600) scale = Math.min(scale, 0.5);
+      dpr = Math.min(window.devicePixelRatio || 1, PERF_CONFIG.maxDpr);
 
-      // ── DPR(고해상도) 지원 ──
-      // 저사양 기기는 DPR 1로 고정, 일반 기기는 최대 2.0으로 제한
-      dpr = isLowEnd ? 1 : Math.min(window.devicePixelRatio || 1, 2.0);
-
-      // CSS 픽셀 크기 (사용자 눈에 보이는 크기)
       const cssW = Math.floor(BASE_W * scale);
       const cssH = Math.floor(BASE_H * scale);
       canvas.style.width = cssW + 'px';
       canvas.style.height = cssH + 'px';
+      const bw = Math.round(cssW * dpr), bh = Math.round(cssH * dpr);
+      if (canvas.width !== bw) canvas.width = bw;
+      if (canvas.height !== bh) canvas.height = bh;
 
-      // 버퍼 픽셀 크기 = CSS 크기 × DPR → Retina에서 선명한 렌더링
-      canvas.width = Math.round(cssW * dpr);
-      canvas.height = Math.round(cssH * dpr);
-
-      // 변환 행렬: 기준 좌표계(480×720) → 실제 버퍼 픽셀
       ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
-      
-      // [최적화] 모바일에서는 이미지 스무딩 품질 조정
-      if (isMobile) {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'low'; // 'high'는 모바일에서 매우 느릴 수 있음
-      } else {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'medium';
-      }
-      
-      ctx.clearRect(0, 0, BASE_W, BASE_H);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = isLowEnd ? 'low' : 'medium';
+      ctx.lineJoin = 'round';
+
+      // 해상도 의존 캐시 재생성 (캐릭터는 해상도가 10% 이상 바뀔 때만)
+      invalidateRenderCaches();
+      const yr = cacheRes() * 1.2; // 메뉴 돼지(82px) 기준 여유 해상도
+      if (!_yeoniRes || Math.abs(yr - _yeoniRes) / _yeoniRes > 0.1) { _yeoniRes = yr; Yeoni.build(yr); }
+      try { _needsRedraw = true; } catch (e) { }
     }
 
     // ResizeObserver로 정밀 추적 (window.resize보다 정확)
@@ -3800,7 +4333,7 @@
     let gameState = STATE.MENU;
 
     // ── 게임 변수 ──
-    let score = 0, bestScore = parseInt(localStorage.getItem('pig_best') || '0');
+    let score = 0, bestScore = 0; // 모드별 최고 기록은 modeBests 참고
     let level = 1, frameCount = 0, lastPipeTime = 0;
     let altitude = 0;        // meters — displayed as km
     // [수정] 고도 속도 - 레벨 4(우주)에서 100km 도달하도록 조정
@@ -3882,9 +4415,12 @@
        */
       release(obj) {
         // 활성 목록에서 제거 (indexOf = 위치 찾기, splice = 제거)
-        const index = this._active.indexOf(obj);
+        // [성능] splice 대신 마지막 원소와 교체 후 pop (O(n) 이동 제거)
+        const arr = this._active;
+        const index = arr.lastIndexOf(obj);
         if (index !== -1) {
-          this._active.splice(index, 1);
+          const last = arr.pop();
+          if (index < arr.length) arr[index] = last;
         }
         
         // 청소 함수가 있으면 객체를 깨끗이 닦음
@@ -3902,7 +4438,9 @@
       releaseAll() {
         // 활성 목록의 모든 객체를 순회하며 반납
         while (this._active.length > 0) {
-          this.release(this._active[0]);
+          const obj = this._active.pop();
+          if (this._reset) this._reset(obj);
+          this._available.push(obj);
         }
       }
       
@@ -4027,6 +4565,8 @@
     let auraPoisonDrainRate = 2;   // 초당 감소 점수 (2점)
     let auraPoisonTotalDrain = 20; // 총 감소 점수
     let lastAuraCenterHit = false; // 중심 충돌 여부
+    let auraPoisonTotalReduction = 0; // [버그수정] 미선언 변수로 게임 루프가 멈추던 문제
+    let lotusTotal = LOTUS_DURATION;  // 현재 보호막의 총 지속시간 (깜빡임 계산용)
 
     let bird = {};
     // [성능 최적화] 객체 풀은 직접 접근 - pool.getActive()로 활성 목록 가져옴
@@ -4062,7 +4602,7 @@
 
     function getPipeGap() {
       // [수정] 레벨 5 이상은 최소 갭 유지 (130px 고정)
-      return PIPE_GAP[Math.min(level - 1, 3)];
+      return Math.max(118, Math.round(PIPE_GAP[Math.min(level - 1, 3)] * DIFF.gapScale));
     }
     function getPipeSpeed() {
       // 레벨별 속도 배율 (60fps 기준 px/frame → _dtFactor로 실시간 보정됨)
@@ -4074,7 +4614,7 @@
       // bolt: 1.9→1.5 — 지나친 속도 급등 방지
       if (boltActive) s *= 1.5;
       // 무적 모드 배속 컨트롤 반영
-      return s * gameSpeedMultiplier;
+      return s * DIFF.speedScale * gameSpeedMultiplier;
     }
     function calcLevel(sc) {
       if (sc >= LVL_THRESHOLDS[4]) return 5;  // [신규] 레벨 5 (무한 모드)
@@ -4084,7 +4624,13 @@
       return 1;
     }
     function saveBest() {
-      if (score > bestScore) { bestScore = score; localStorage.setItem('pig_best', bestScore); }
+      if (score > (modeBests[currentDiffId] || 0)) {
+        modeBests[currentDiffId] = score;
+        saveModeBests();
+      }
+      bestScore = modeBests[currentDiffId];
+      const overall = Math.max(...DIFF_ORDER.map(id => modeBests[id] || 0));
+      store.set('pig_best', overall);
     }
 
     /* ================================================================
@@ -4414,45 +4960,36 @@
     }
     
     function drawParticles() {
-      // [성능 최적화] 객체 풀에서 활성 파티클 가져와 그리기
-      const activeParticles = particlePool.getActive();
-      const len = activeParticles.length;
-      // [최적화] forEach → for 루프
-      for (let i = 0; i < len; i++) {
-        const p = activeParticles[i];
+      // [성능] shadowBlur·save/restore 제거, globalAlpha 만 바꿔가며 그림
+      const arr = particlePool.getActive();
+      const TAU = Math.PI * 2;
+      ctx.textAlign = 'center';
+      for (let i = 0, len = arr.length; i < len; i++) {
+        const p = arr[i];
         const alpha = p.life;
         if (alpha <= 0) continue;
-        ctx.save(); ctx.globalAlpha = alpha > 1 ? 1 : alpha;
-        if (p.type === 'text') {
-          ctx.font = `bold ${p.size}px Orbitron,monospace`;
-          ctx.fillStyle = p.color; ctx.textAlign = 'center';
-          if (!isLowEnd) { ctx.shadowColor = p.color; ctx.shadowBlur = 12; }
-          ctx.fillText(p.text, p.x, p.y);
-        } else if (p.type === 'smoke') {
-          ctx.fillStyle = p.color;
-          if (!isLowEnd) { ctx.shadowColor = p.color; ctx.shadowBlur = 18; }
-          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
-        } else if (p.type === 'spark') {
-          ctx.fillStyle = p.color;
-          if (!isLowEnd) { ctx.shadowColor = p.color; ctx.shadowBlur = 10; }
-          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
-        } else if (p.type === 'shockwave') {
-          ctx.strokeStyle = p.color; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.stroke();
-        } else if (p.type === 'pollen') {
-          ctx.translate(p.x, p.y); ctx.rotate(p.rotation);
-          if (!isLowEnd) { ctx.shadowColor = p.color; ctx.shadowBlur = 8; }
-          ctx.fillStyle = p.color;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, p.size * 0.5, p.size, 0, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.fillStyle = p.color;
-          if (p.type === 'sparkle' && !isLowEnd) { ctx.shadowColor = p.color; ctx.shadowBlur = 8; }
-          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = alpha > 1 ? 1 : alpha;
+        switch (p.type) {
+          case 'text':
+            ctx.font = `900 ${p.size}px Orbitron, 'Noto Sans KR', sans-serif`;
+            ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(45,20,60,0.7)';
+            ctx.strokeText(p.text, p.x, p.y);
+            ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+            break;
+          case 'shockwave':
+            ctx.strokeStyle = p.color; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.stroke();
+            break;
+          case 'pollen':
+            ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.ellipse(p.x, p.y, p.size * 0.5, p.size, p.rotation || 0, 0, TAU); ctx.fill();
+            break;
+          default:
+            ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, TAU); ctx.fill();
         }
-        ctx.restore();
       }
+      ctx.globalAlpha = 1;
     }
 
     /* ================================================================
@@ -4476,7 +5013,7 @@
         nebulaClouds.push({
           x: rand(0, BASE_W), y: rand(40, BASE_H * 0.7),
           rx: rand(60, 130), ry: rand(30, 70),
-          color: `hsla(${rand(250, 310)},70%,30%,`,
+          color: `hsla(${rand(250, 310) | 0},70%,30%,`,
           alpha: rand(0.05, 0.12), speed: rand(0.1, 0.3)
         });
       }
@@ -4497,34 +5034,35 @@
       }
     }
     function drawStars(alpha = 1) {
-      // Nebula clouds
+      // 성운: 캐시된 글로우 스프라이트를 타원으로 늘려 그림
       for (let i = 0, len = nebulaClouds.length; i < len; i++) {
         const n = nebulaClouds[i];
-        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, Math.max(n.rx, n.ry));
-        g.addColorStop(0, n.color + (n.alpha * alpha * 2) + ')');
-        g.addColorStop(1, n.color + '0)');
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.ellipse(n.x, n.y, n.rx, n.ry, 0, 0, Math.PI * 2); ctx.fill();
+        const c = glowSprite('neb' + n.color, [[0, n.color + '1)'], [1, n.color + '0)']]);
+        ctx.globalAlpha = Math.min(1, n.alpha * alpha * 2);
+        ctx.drawImage(c, n.x - n.rx, n.y - n.ry, n.rx * 2, n.ry * 2);
       }
-      // Stars
+      ctx.fillStyle = '#fff';
       for (let i = 0, len = stars.length; i < len; i++) {
         const s = stars[i];
         const tw = s.alpha * (0.6 + Math.sin(s.twinklePhase) * 0.4) * alpha;
         if (tw <= 0) continue;
-        ctx.save();
         ctx.globalAlpha = tw;
-        ctx.fillStyle = '#fff';
         ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2); ctx.fill();
-        if (s.size > 1.6 && !isLowEnd) { // 저사양은 별 십자가 장식 생략
-          ctx.strokeStyle = `rgba(255,255,255,0.35)`;
-          ctx.lineWidth = 0.5;
-          ctx.beginPath();
-          ctx.moveTo(s.x - s.size * 2.2, s.y); ctx.lineTo(s.x + s.size * 2.2, s.y);
-          ctx.moveTo(s.x, s.y - s.size * 2.2); ctx.lineTo(s.x, s.y + s.size * 2.2);
-          ctx.stroke();
-        }
-        ctx.restore();
       }
+      if (!isLowEnd) {
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.5;
+        ctx.globalAlpha = 0.35 * alpha;
+        ctx.beginPath();
+        for (let i = 0, len = stars.length; i < len; i++) {
+          const s = stars[i];
+          if (s.size <= 1.6) continue;
+          const r = s.size * 2.2;
+          ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x + r, s.y);
+          ctx.moveTo(s.x, s.y - r); ctx.lineTo(s.x, s.y + r);
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     }
 
     /* ================================================================
@@ -4628,447 +5166,265 @@
 
     /* ================================================================
        GROUND DECORATIONS - Level Specific
+       [성능] 장식은 레벨별로 한 번만 오프스크린 스트립에 그려두고
+       패럴랙스 오프셋으로 drawImage 2회만 수행 (기존: 매 프레임 수백 개 path+stroke)
        ================================================================ */
-    // [신규] 스테이지별 바닥 장식 데이터
     let levelDecorations = { cacti: [], lamps: [], stars: [] };
+    let _decorStrips = {};
+    const DECOR_H = 130; // 지면 위로 장식이 차지하는 최대 높이
 
     function initGroundDecorations() {
       groundFlowers = [];
       groundGrass = [];
       levelDecorations = { cacti: [], lamps: [], stars: [] };
-      const groundY = BASE_H - GROUND_H;
+      _decorStrips = {};
       const gc = PERF_CONFIG.groundDecor;
 
-      // 레벨 1: 풀과 꽃 ([최적화] 모바일에서 수량 감소)
-      const grassCount = Math.floor(80 * gc);
+      const grassCount = Math.floor(70 * gc);
       const flowerCount = Math.floor(22 * gc);
       for (let i = 0; i < grassCount; i++) {
-        groundGrass.push({
-          x: rand(0, BASE_W), height: rand(8, 22),
-          width: rand(1.5, 3.5), lean: rand(-0.3, 0.3),
-          color: `hsl(${rand(100, 135)},${rand(50, 80)}%,${rand(30, 50)}%)`,
-          phase: rand(0, Math.PI * 2)
-        });
+        groundGrass.push({ x: rand(0, BASE_W), height: rand(8, 22), width: rand(1.5, 3.5) });
       }
       for (let i = 0; i < flowerCount; i++) {
         groundFlowers.push({
-          x: rand(0, BASE_W), stemH: rand(12, 26),
-          petalR: rand(4, 8),
-          petalColor: `hsl(${rand(300, 360)},90%,${rand(65, 85)}%)`,
-          centerColor: `hsl(${rand(40, 60)},100%,${rand(55, 70)}%)`,
-          petalCount: rand(5, 7) | 0,
-          phase: rand(0, Math.PI * 2), speed: rand(0.02, 0.04)
+          x: rand(0, BASE_W), stemH: rand(12, 26), petalR: rand(4, 8),
+          petalColor: `hsl(${rand(300, 360) | 0},90%,${rand(65, 85) | 0}%)`,
+          centerColor: `hsl(${rand(40, 60) | 0},100%,${rand(55, 70) | 0}%)`,
+          rot: rand(0, Math.PI * 2), lean: rand(-3, 3)
         });
       }
-
-      // [신규] 레벨 2: 선인장 ([최적화] 모바일에서 수량 감소)
-      const cactusCount = Math.floor(8 * gc);
+      const cactusCount = Math.max(2, Math.floor(8 * gc));
       for (let i = 0; i < cactusCount; i++) {
-        levelDecorations.cacti.push({
-          x: rand(0, BASE_W), h: rand(25, 50),
-          w: rand(10, 16), armCount: rand(1, 3) | 0,
-          phase: rand(0, Math.PI * 2)
-        });
+        levelDecorations.cacti.push({ x: rand(0, BASE_W), h: rand(25, 50), w: rand(10, 16), armCount: rand(1, 3) | 0 });
       }
-
-      // [신규] 레벨 3: 가로등
-      const lampCount = Math.floor(5 * gc);
+      const lampCount = Math.max(2, Math.floor(5 * gc));
       for (let i = 0; i < lampCount; i++) {
-        levelDecorations.lamps.push({
-          x: rand(60, BASE_W - 60), h: rand(60, 90),
-          phase: rand(0, Math.PI * 2)
-        });
+        levelDecorations.lamps.push({ x: rand(30, BASE_W - 30), h: rand(60, 90), phase: rand(0, Math.PI * 2) });
       }
-
-      // [신규] 레벨 4: 떨어지는 별 (운석) ([최적화] 모바일에서 수량 감소)
-      const starCount = Math.floor(15 * gc);
+      const starCount = Math.floor(12 * gc);
       for (let i = 0; i < starCount; i++) {
         levelDecorations.stars.push({
           x: rand(0, BASE_W), y: rand(0, BASE_H * 0.6),
-          size: rand(1, 3), speed: rand(0.5, 2),
-          tail: rand(10, 25), phase: rand(0, Math.PI * 2)
+          size: rand(1, 3), speed: rand(0.5, 2), tail: rand(10, 25)
         });
       }
     }
 
-    function drawGroundDecorations(timestamp, stageAlpha) {
+    // 스트립 캔버스: y=0 이 지면선. 경계를 넘는 오브젝트는 ±BASE_W 위치에도 그려 이음새 없이 반복
+    function getDecorStrip(name, painter) {
+      const key = name + ':' + _renderCacheGen;
+      const st = _decorStrips[name];
+      if (st && st.key === key) return st.c;
+      const res = cacheRes();
+      const c = makeCanvas(BASE_W * res, (DECOR_H + 8) * res);
+      const g = c.getContext('2d');
+      g.scale(res, res);
+      g.translate(0, DECOR_H);
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      for (const dx of [-BASE_W, 0, BASE_W]) { g.save(); g.translate(dx, 0); painter(g); g.restore(); }
+      _decorStrips[name] = { key, c };
+      return c;
+    }
+    function blitDecor(c, parallax) {
       const groundY = BASE_H - GROUND_H;
-      const time = timestamp * 0.001;
+      const off = ((groundOffset * parallax) % BASE_W + BASE_W) % BASE_W;
+      ctx.drawImage(c, -off, groundY - DECOR_H, BASE_W, DECOR_H + 8);
+      ctx.drawImage(c, BASE_W - off, groundY - DECOR_H, BASE_W, DECOR_H + 8);
+    }
 
-      // [수정] 레벨별 장식 그리기
-      switch (level) {
-        case 1:
-          drawLevel1Decorations(time, groundY, stageAlpha);
-          break;
-        case 2:
-          drawLevel2Cacti(time, groundY, stageAlpha);
-          break;
-        case 3:
-          drawLevel3Lamps(time, groundY, stageAlpha);
-          break;
-        case 4:
-          drawLevel4Stars(time, groundY, stageAlpha);
-          break;
+    function paintGrass(g) {
+      g.fillStyle = '#5ac23a'; g.strokeStyle = '#111'; g.lineWidth = 2;
+      for (const b of groundGrass) {
+        g.beginPath();
+        g.moveTo(b.x - b.width, 0);
+        g.quadraticCurveTo(b.x - b.width * 0.5, -b.height, b.x + b.width * 0.5, -b.height - 2);
+        g.quadraticCurveTo(b.x + b.width, -b.height * 0.5, b.x + b.width, 0);
+        g.fill(); g.stroke();
+      }
+    }
+    function paintFlowers(g) {
+      for (const f of groundFlowers) {
+        const cx = f.x + f.lean, cy = -f.stemH;
+        g.strokeStyle = '#3a8a2a'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(f.x, 0); g.lineTo(cx, cy); g.stroke();
+        g.fillStyle = '#4a9c30'; g.strokeStyle = '#111'; g.lineWidth = 2;
+        g.beginPath(); g.ellipse(f.x + 2, -f.stemH * 0.5, 4, 8, Math.PI / 4, 0, Math.PI * 2); g.fill(); g.stroke();
+        const r = Math.max(4, f.petalR);
+        g.fillStyle = f.petalColor;
+        for (let i = 0; i < 5; i++) {
+          const a = i * Math.PI * 2 / 5 + f.rot;
+          g.beginPath(); g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, r * 0.8, 0, Math.PI * 2); g.fill(); g.stroke();
+        }
+        g.fillStyle = f.centerColor;
+        g.beginPath(); g.arc(cx, cy, r * 0.7, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.fillStyle = 'rgba(255,255,255,0.4)';
+        g.beginPath(); g.arc(cx - r * 0.2, cy - r * 0.2, r * 0.25, 0, Math.PI * 2); g.fill();
+      }
+    }
+    function paintCacti(g) {
+      for (const c of levelDecorations.cacti) {
+        const cx = c.x;
+        g.fillStyle = '#4dbf35'; g.strokeStyle = '#111'; g.lineWidth = 2.5;
+        for (let i = 0; i < c.armCount; i++) {
+          const armY = -c.h * (0.3 + i * 0.25);
+          const side = (i % 2 === 0) ? -1 : 1;
+          const armX = cx + side * c.w * 0.4;
+          g.beginPath();
+          g.rect(side === -1 ? armX - c.w * 0.3 : cx, armY - c.w * 0.15, c.w * 0.7, c.w * 0.3);
+          g.rect(armX - c.w * 0.15, armY - c.h * 0.3, c.w * 0.3, c.h * 0.3 + c.w * 0.15);
+          g.fill(); g.stroke();
+        }
+        g.beginPath();
+        if (g.roundRect) g.roundRect(cx - c.w * 0.3, -c.h, c.w * 0.6, c.h, c.w * 0.3); else g.rect(cx - c.w * 0.3, -c.h, c.w * 0.6, c.h);
+        g.fill(); g.stroke();
+        g.strokeStyle = '#7be866'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(cx - c.w * 0.1, -c.h * 0.85); g.lineTo(cx - c.w * 0.1, -c.h * 0.15); g.stroke();
+        g.fillStyle = '#111';
+        for (let k = 0; k < 3; k++) {
+          g.fillRect(cx + c.w * 0.3 - 1, -c.h * (0.3 + k * 0.2), 4, 2);
+          g.fillRect(cx - c.w * 0.3 - 3, -c.h * (0.4 + k * 0.2), 4, 2);
+        }
+      }
+    }
+    function paintLamps(g) {
+      for (const l of levelDecorations.lamps) {
+        const lx = l.x;
+        g.fillStyle = 'rgba(255,244,143,0.18)';
+        g.beginPath(); g.arc(lx, -l.h + 8, 24, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,244,143,0.35)';
+        g.beginPath(); g.arc(lx, -l.h + 8, 12, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#444'; g.strokeStyle = '#111'; g.lineWidth = 2.5;
+        g.fillRect(lx - 3, -l.h, 6, l.h); g.strokeRect(lx - 3, -l.h, 6, l.h);
+        g.fillStyle = '#777'; g.fillRect(lx - 1, -l.h, 2, l.h);
+        g.fillStyle = '#2a2a3a';
+        g.beginPath();
+        g.moveTo(lx - 12, -l.h); g.lineTo(lx + 12, -l.h); g.lineTo(lx + 6, -l.h - 10); g.lineTo(lx - 6, -l.h - 10);
+        g.closePath(); g.fill(); g.stroke();
+        g.fillStyle = '#ffeb3b';
+        g.beginPath(); g.arc(lx, -l.h + 6, 5, 0, Math.PI * 2); g.fill(); g.stroke();
       }
     }
 
-    // 레벨 1: 풀과 꽃 (카툰 2D 플랫폼 감성)
-    function drawLevel1Decorations(time, groundY, alpha) {
-      if (alpha <= 0) return;
-      ctx.save(); ctx.globalAlpha = alpha;
-
-      groundGrass.forEach(g => {
-        const gx = ((g.x - groundOffset * 0.3) % BASE_W + BASE_W) % BASE_W;
-        ctx.fillStyle = '#5ac23a';
-        ctx.strokeStyle = '#111';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        // 둥글고 귀여운 2D 잔디 조각
-        ctx.moveTo(gx - g.width, groundY);
-        ctx.quadraticCurveTo(gx - g.width*0.5, groundY - g.height, gx + g.width*0.5, groundY - g.height - 2);
-        ctx.quadraticCurveTo(gx + g.width, groundY - g.height*0.5, gx + g.width, groundY);
-        ctx.fill();
-        ctx.stroke();
-      });
-
-      groundFlowers.forEach(f => {
-        const sway = Math.sin(time * f.speed * 60 + f.phase) * 4;
-        const fx = ((f.x - groundOffset * 0.4) % BASE_W + BASE_W) % BASE_W;
-        const stemY = groundY - f.stemH;
-        
-        // 줄기
-        ctx.strokeStyle = '#3a8a2a'; 
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(fx, groundY);
-        ctx.lineTo(fx + sway * 0.5, stemY);
-        ctx.stroke();
-
-        // 가장자리 잎사귀
-        ctx.fillStyle = '#4a9c30';
-        ctx.strokeStyle = '#111';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.ellipse(fx + 2 + sway * 0.2, groundY - f.stemH * 0.5, 4, 8, Math.PI / 4, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
-
-        // 카툰 2D 꽃잎
-        const cx = fx + sway * 0.5;
-        const cy = stemY;
-        ctx.fillStyle = f.petalColor;
-        
-        const r = Math.max(4, f.petalR); // 꽃잎 크기 확정
-        for (let i = 0; i < 5; i++) {
-           const a = i * Math.PI * 2 / 5 + time * 0.5;
-           const px = cx + Math.cos(a) * r;
-           const py = cy + Math.sin(a) * r;
-           ctx.beginPath();
-           ctx.arc(px, py, r * 0.8, 0, Math.PI * 2);
-           ctx.fill(); ctx.stroke();
-        }
-        
-        // 가운데 매듭
-        ctx.fillStyle = f.centerColor || '#ffdb58';
-        ctx.beginPath();
-        ctx.arc(cx, cy, r * 0.7, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
-        
-        // 반사광 하이라이트
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.beginPath();
-        ctx.arc(cx - r*0.2, cy - r*0.2, r*0.25, 0, Math.PI*2);
-        ctx.fill();
-      });
-
-      ctx.restore();
+    function drawGroundDecorations(timestamp) {
+      switch (level) {
+        case 1:
+          blitDecor(getDecorStrip('grass', paintGrass), 0.3);
+          blitDecor(getDecorStrip('flowers', paintFlowers), 0.4);
+          break;
+        case 2: blitDecor(getDecorStrip('cacti', paintCacti), 0.5); break;
+        case 3: blitDecor(getDecorStrip('lamps', paintLamps), 0.6); break;
+        case 4: drawLevel4Stars(timestamp * 0.001); break;
+      }
     }
 
-    // [신규] 레벨 2: 선인장 (고급 2D 카툰 렌더링)
-    function drawLevel2Cacti(time, groundY, alpha) {
-      ctx.save(); ctx.globalAlpha = alpha;
-
-      levelDecorations.cacti.forEach(c => {
-        const cx = ((c.x - groundOffset * 0.5) % BASE_W + BASE_W) % BASE_W;
-        const sway = Math.sin(time * 0.8 + c.phase) * 2;
-        
-        ctx.fillStyle = '#4dbf35';
-        ctx.strokeStyle = '#111';
-        ctx.lineWidth = 2.5;
-
-        // 양팔
-        for (let i = 0; i < c.armCount; i++) {
-           const armY = groundY - c.h * (0.3 + i * 0.25);
-           const armSide = (i % 2 === 0) ? -1 : 1;
-           const armX = cx + sway + armSide * c.w * 0.4;
-           
-           ctx.beginPath();
-           // 수평 파트
-           ctx.roundRect(armSide === -1 ? armX - c.w*0.3 : cx + sway, armY - c.w*0.15, c.w*0.7, c.w*0.3, c.w*0.15);
-           // 수직 꺾임 파트
-           ctx.roundRect(armX - c.w*0.15, armY - c.h*0.3, c.w*0.3, c.h*0.3 + c.w*0.15, c.w*0.15);
-           ctx.fill(); ctx.stroke();
-        }
-
-        // 메인 바디
-        ctx.beginPath();
-        ctx.roundRect(cx + sway - c.w*0.3, groundY - c.h, c.w*0.6, c.h, c.w*0.3);
-        ctx.fill(); ctx.stroke();
-
-        // 2D 하이라이트 질감선 (카툰 음영)
-        ctx.strokeStyle = '#7be866';
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(cx + sway - c.w*0.1, groundY - c.h * 0.85);
-        ctx.lineTo(cx + sway - c.w*0.1, groundY - c.h * 0.15);
-        ctx.stroke();
-        
-        // 가시
-        ctx.fillStyle = '#111';
-        for(let k = 0; k < 3; k++) {
-           ctx.fillRect(cx + sway + c.w*0.3 - 1, groundY - c.h * (0.3 + k*0.2), 4, 2);
-           ctx.fillRect(cx + sway - c.w*0.3 - 3, groundY - c.h * (0.4 + k*0.2), 4, 2);
-        }
-      });
-
-      ctx.restore();
-    }
-
-    // [신규] 레벨 3: 가로등 (아케이드 2D 스타일)
-    function drawLevel3Lamps(time, groundY, alpha) {
-      ctx.save(); ctx.globalAlpha = alpha;
-
-      levelDecorations.lamps.forEach(l => {
-        const lx = ((l.x - groundOffset * 0.6) % BASE_W + BASE_W) % BASE_W;
-        
-        ctx.fillStyle = '#444';
-        ctx.strokeStyle = '#111';
-        ctx.lineWidth = 2.5;
-        
-        // 기둥
-        ctx.fillRect(lx - 3, groundY - l.h, 6, l.h);
-        ctx.strokeRect(lx - 3, groundY - l.h, 6, l.h);
-
-        // 하이라이트
-        ctx.fillStyle = '#777';
-        ctx.fillRect(lx - 1, groundY - l.h, 2, l.h);
-
-        // 램프 덮개
-        ctx.fillStyle = '#2a2a3a';
-        ctx.beginPath();
-        ctx.moveTo(lx - 12, groundY - l.h);
-        ctx.lineTo(lx + 12, groundY - l.h);
-        ctx.lineTo(lx + 6, groundY - l.h - 10);
-        ctx.lineTo(lx - 6, groundY - l.h - 10);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-
-        // 깜빡이는 전구
-        const isBlinking = Math.sin(time*1.5 + l.phase) > -0.5; // 불규칙한 점멸 효과
-        ctx.fillStyle = isBlinking ? '#ffeb3b' : '#665c19';
-        ctx.beginPath();
-        ctx.arc(lx, groundY - l.h + 6, 5, 0, Math.PI*2);
-        ctx.fill(); ctx.stroke();
-
-        // 아케이드풍 테두리 글로우 (플랫한 원반 형태)
-        if (isBlinking) {
-           ctx.globalAlpha = alpha * 0.2;
-           ctx.fillStyle = '#fff48f';
-           ctx.beginPath();
-           ctx.arc(lx, groundY - l.h + 8, 24, 0, Math.PI*2);
-           ctx.fill();
-           ctx.globalAlpha = alpha * 0.4;
-           ctx.beginPath();
-           ctx.arc(lx, groundY - l.h + 8, 12, 0, Math.PI*2);
-           ctx.fill();
-        }
-      });
-
-      ctx.restore();
-    }
-
-    // [신규] 레벨 4: 떨어지는 별/운석 (카툰 2D 혜성 룩)
-    function drawLevel4Stars(time, groundY, alpha) {
-      ctx.save(); ctx.globalAlpha = alpha;
-
-      levelDecorations.stars.forEach(s => {
-        const fallY = (s.y + time * s.speed * 50) % (BASE_H * 0.8);
+    // 레벨 4: 떨어지는 별/운석 (동적이지만 개수가 적고 단순)
+    function drawLevel4Stars(time) {
+      ctx.lineWidth = 2; ctx.strokeStyle = '#111';
+      for (const s of levelDecorations.stars) {
+        const sy = (s.y + time * s.speed * 50) % (BASE_H * 0.8);
         const sx = ((s.x - groundOffset * 0.2 + time * 20) % BASE_W + BASE_W) % BASE_W;
-        const sy = fallY;
-
-        ctx.fillStyle = '#e0f0ff';
-        ctx.strokeStyle = '#111';
-        ctx.lineWidth = 2;
-        
-        // 카툰 꼬리 모양 (삼각형 스피드라인 느낌)
         ctx.fillStyle = '#7ac2ff';
         ctx.beginPath();
-        ctx.moveTo(sx + s.size*0.8, sy - s.size*0.8);
-        ctx.lineTo(sx + s.tail*0.8, sy - s.tail);
-        ctx.lineTo(sx - s.size*0.8, sy + s.size*0.8);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-
-        // 본체 원
+        ctx.moveTo(sx + s.size * 0.8, sy - s.size * 0.8);
+        ctx.lineTo(sx + s.tail * 0.8, sy - s.tail);
+        ctx.lineTo(sx - s.size * 0.8, sy + s.size * 0.8);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#d1eaff';
-        ctx.beginPath(); 
-        ctx.arc(sx, sy, s.size * 1.5, 0, Math.PI * 2); 
-        ctx.fill(); ctx.stroke();
-        
-        // 꼬리 하이라이트/질감
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(sx + s.size, sy - s.size);
-        ctx.lineTo(sx + s.tail*0.5, sy - s.tail*0.6);
-        ctx.stroke();
-      });
-
-      ctx.restore();
+        ctx.beginPath(); ctx.arc(sx, sy, s.size * 1.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
     }
 
     /* ================================================================
-       BACKGROUND
+       BACKGROUND — 레벨 전환 시 배경 크로스페이드
        ================================================================ */
-    function drawBackground(timestamp) {
-      const time = timestamp * 0.001;
-      // [수정] 레벨 5+는 레벨 4 배경(우주) 사용
-      const bgLevel = level >= 5 ? 4 : level;
-      const bgImg = bgImages[bgLevel];
-
-      if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
-        const ir = bgImg.naturalWidth / bgImg.naturalHeight;
-        const cr = BASE_W / BASE_H;
+    let bgFade = { from: 0, start: 0 };
+    const BG_FADE_MS = 1400;
+    const BG_FALLBACK = { 1: ['#b0e0ff', '#e8f4fd'], 2: ['#ff8c42', '#ffe4b5'], 3: ['#0d0d2e', '#1a1a4a'], 4: ['#03030f', '#060615'] };
+    function bgLevelOf(lv) { return lv >= 5 ? 4 : lv; }
+    function drawBgImage(bgLevel, alpha) {
+      const img = bgImages[bgLevel];
+      ctx.globalAlpha = alpha;
+      if (img && img.complete && img.naturalWidth > 0) {
+        const ir = img.naturalWidth / img.naturalHeight, cr = BASE_W / BASE_H;
         let dw, dh, dx, dy;
         if (ir > cr) { dh = BASE_H; dw = dh * ir; dx = (BASE_W - dw) / 2; dy = 0; }
         else { dw = BASE_W; dh = dw / ir; dx = 0; dy = (BASE_H - dh) / 2; }
-        ctx.drawImage(bgImg, dx, dy, dw, dh);
+        ctx.drawImage(img, dx, dy, dw, dh);
       } else {
-        // Canvas fallback gradient
-        const bgGrads = {
-          1: ['#b0e0ff', '#e8f4fd'], 2: ['#ff8c42', '#ffe4b5'],
-          3: ['#0d0d2e', '#1a1a4a'], 4: ['#03030f', '#060615']
-        };
-        // [수정] 레벨 5+는 우주 배경
-        const [c1, c2] = bgGrads[bgLevel] || bgGrads[1];
+        const [c1, c2] = BG_FALLBACK[bgLevel] || BG_FALLBACK[1];
         const g = ctx.createLinearGradient(0, 0, 0, BASE_H);
         g.addColorStop(0, c1); g.addColorStop(1, c2);
         ctx.fillStyle = g; ctx.fillRect(0, 0, BASE_W, BASE_H);
       }
-
-      // Stars for level 3+
-      // [수정] 레벨 5+에서도 별과 성운 효과 강화
-      if (level >= 3) drawStars(level >= 4 ? 0.95 : 0.5);
-
-      // Atmospheric glow overlay
-      // [수정] 레벨 4+에서 성운 효과
-      if (level >= 4) {
-        const nebulaG = ctx.createRadialGradient(BASE_W * 0.7, BASE_H * 0.3, 0, BASE_W * 0.7, BASE_H * 0.3, 250);
-        nebulaG.addColorStop(0, 'rgba(100,0,160,0.08)');
-        nebulaG.addColorStop(1, 'rgba(100,0,160,0)');
-        ctx.fillStyle = nebulaG; ctx.fillRect(0, 0, BASE_W, BASE_H);
+      ctx.globalAlpha = 1;
+    }
+    function drawBackground(timestamp) {
+      const cur = bgLevelOf(level);
+      drawBgImage(cur, 1);
+      if (bgFade.from) {
+        const p = (performance.now() - bgFade.start) / BG_FADE_MS;
+        if (p < 1 && bgFade.from !== cur) drawBgImage(bgFade.from, 1 - p * p);
+        else bgFade.from = 0;
       }
-
-      // Ground
+      if (level >= 3) drawStars(level >= 4 ? 0.95 : 0.5);
+      if (level >= 4) drawGlow('nebulaBig', GLOW.nebulaBig, BASE_W * 0.7, BASE_H * 0.3, 250, 1);
       drawGround(timestamp);
     }
 
+    /* ================================================================
+       GROUND — 레벨별 지면을 (BASE_W + 260)px 스트립으로 캐시
+       (타일 52px, 톱니 20px 의 최소공배수 260 → 이음새 없는 반복)
+       ================================================================ */
+    const GROUND_THEMES = {
+      1: { topSurface: '#73cf32', topEdge: '#529b20', soil: '#e0a96d', patternDark: '#b27a3c', patternLight: '#eaba7e' },
+      2: { topSurface: '#fbdf71', topEdge: '#dcb34e', soil: '#eec278', patternDark: '#ca974a', patternLight: '#f5d590' },
+      3: { topSurface: '#d665a3', topEdge: '#a93976', soil: '#432657', patternDark: '#261138', patternLight: '#523467' },
+      4: { topSurface: '#9d9ea6', topEdge: '#73757f', soil: '#545561', patternDark: '#353641', patternLight: '#656775' }
+    };
+    const GROUND_PERIOD = 260;
+    let _groundStrip = null, _groundKey = '';
+    function getGroundStrip() {
+      const theme = Math.min(level, 4);
+      const key = theme + ':' + _renderCacheGen;
+      if (_groundStrip && _groundKey === key) return _groundStrip;
+      const res = cacheRes();
+      const W = BASE_W + GROUND_PERIOD, H = GROUND_H;
+      const c = makeCanvas(W * res, H * res);
+      const g = c.getContext('2d');
+      g.scale(res, res);
+      const gt = GROUND_THEMES[theme];
+      g.fillStyle = gt.soil; g.fillRect(0, 0, W, H);
+      const bs = 26;
+      for (let y = 0; y * bs < H - 16; y++) {
+        for (let x = 0; x * bs < W; x++) {
+          const dx = x * bs, dy = 16 + y * bs;
+          g.fillStyle = (x + y) % 2 === 0 ? gt.patternLight : gt.patternDark;
+          g.fillRect(dx, dy, bs, bs);
+          g.fillStyle = 'rgba(0,0,0,0.15)';
+          g.fillRect(dx + bs - 3, dy, 3, bs); g.fillRect(dx, dy + bs - 3, bs, 3);
+          g.fillStyle = 'rgba(255,255,255,0.15)';
+          g.fillRect(dx, dy, 3, bs); g.fillRect(dx, dy, bs, 3);
+        }
+      }
+      const surfaceH = 22;
+      g.fillStyle = gt.topSurface; g.fillRect(0, 0, W, surfaceH);
+      g.fillStyle = gt.topEdge; g.fillRect(0, surfaceH - 6, W, 6);
+      for (let i = 0; i < W; i += 20) {
+        g.fillStyle = gt.topSurface;
+        g.beginPath(); g.moveTo(i, surfaceH - 4); g.lineTo(i + 10, surfaceH + 5); g.lineTo(i + 20, surfaceH - 4); g.fill();
+        g.fillStyle = gt.topEdge;
+        g.beginPath(); g.moveTo(i + 6, surfaceH); g.lineTo(i + 10, surfaceH + 5); g.lineTo(i + 14, surfaceH); g.fill();
+      }
+      g.fillStyle = 'rgba(255,255,255,0.4)'; g.fillRect(0, 2, W, 3);
+      g.fillStyle = '#000'; g.fillRect(0, 0, W, 2);
+      _groundStrip = c; _groundKey = key;
+      return c;
+    }
     function drawGround(timestamp) {
       const groundY = BASE_H - GROUND_H;
-      const time = timestamp * 0.001;
-
-      // 고급 2D 지면 레이어를 위한 테마 팔레트 (플랫폼 게임 감성)
-      const groundThemes = {
-        1: { topSurface: '#73cf32', topEdge: '#529b20', soilGrad1: '#e0a96d', soilGrad2: '#c28b4c', patternDark: '#b27a3c', patternLight: '#eaba7e' }, // 잔디/흙 (초원)
-        2: { topSurface: '#fbdf71', topEdge: '#dcb34e', soilGrad1: '#eec278', soilGrad2: '#d8aa5a', patternDark: '#ca974a', patternLight: '#f5d590' }, // 사막
-        3: { topSurface: '#d665a3', topEdge: '#a93976', soilGrad1: '#432657', soilGrad2: '#301844', patternDark: '#261138', patternLight: '#523467' }, // 사이버(네온)
-        4: { topSurface: '#9d9ea6', topEdge: '#73757f', soilGrad1: '#545561', soilGrad2: '#3f404d', patternDark: '#353641', patternLight: '#656775' }  // 달/우주
-      };
-      
-      const gt = groundThemes[Math.min(level, 4)] || groundThemes[1];
-
-      // 1. 단단한 흙/지반 레이어 (Soil) 배경
-      ctx.fillStyle = gt.soilGrad1;
-      ctx.fillRect(0, groundY, BASE_W, GROUND_H);
-
-      // 2. 지반 텍스처 (스크롤링되는 바둑판 3D 타일 질감)
-      const blockSize = 26;
-      const bxCount = Math.ceil(BASE_W / blockSize) + 1;
-      const byCount = Math.ceil(GROUND_H / blockSize) + 1;
-      
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, groundY + 16, BASE_W, GROUND_H - 16); 
-      ctx.clip();
-      
-      // 속도에 맞춰 타일도 자연스럽게 스크롤
-      const offsetX = -(groundOffset % (blockSize * 2));
-      for (let y = 0; y < byCount; y++) {
-          for (let x = 0; x < bxCount + 1; x++) {
-              const drawX = offsetX + x * blockSize;
-              const drawY = groundY + 16 + y * blockSize;
-              
-              if ((x + y) % 2 === 0) {
-                 ctx.fillStyle = gt.patternLight;
-              } else {
-                 ctx.fillStyle = gt.patternDark;
-              }
-              ctx.fillRect(drawX, drawY, blockSize, blockSize);
-              
-              // 타일에 입체감 부여 (Bevel 엣지)
-              ctx.fillStyle = 'rgba(0,0,0,0.15)';
-              ctx.fillRect(drawX + blockSize - 3, drawY, 3, blockSize);
-              ctx.fillRect(drawX, drawY + blockSize - 3, blockSize, 3);
-              ctx.fillStyle = 'rgba(255,255,255,0.15)';
-              ctx.fillRect(drawX, drawY, 3, blockSize);
-              ctx.fillRect(drawX, drawY, blockSize, 3);
-          }
-      }
-      ctx.restore();
-
-      // 3. 상단 표면 레이어 (잔디, 모래 등)
-      const surfaceH = 22;
-      ctx.fillStyle = gt.topSurface;
-      ctx.fillRect(0, groundY, BASE_W, surfaceH);
-      
-      // 표면 하단 그림자 (경계를 입체적으로)
-      ctx.fillStyle = gt.topEdge;
-      ctx.fillRect(0, groundY + surfaceH - 6, BASE_W, 6);
-
-      // 표면 장식무늬 (잔디 톱니 혹은 흙 처짐 질감)
-      ctx.fillStyle = gt.topSurface;
-      const decOffsetX = -(groundOffset % 20);
-      for (let i = 0; i <= BASE_W + 20; i += 20) {
-          ctx.beginPath();
-          ctx.moveTo(decOffsetX + i, groundY + surfaceH - 4);
-          ctx.lineTo(decOffsetX + i + 10, groundY + surfaceH + 5);
-          ctx.lineTo(decOffsetX + i + 20, groundY + surfaceH - 4);
-          ctx.fill();
-          
-          // 톱니에도 그림자
-          ctx.fillStyle = gt.topEdge;
-          ctx.beginPath();
-          ctx.moveTo(decOffsetX + i + 6, groundY + surfaceH);
-          ctx.lineTo(decOffsetX + i + 10, groundY + surfaceH + 5);
-          ctx.lineTo(decOffsetX + i + 14, groundY + surfaceH);
-          ctx.fill();
-          ctx.fillStyle = gt.topSurface; 
-      }
-
-      // 4. 표면 맨 위 얇고 밝은 반사광 (폴리싱된 2D 느낌 강조)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.fillRect(0, groundY, BASE_W, 3);
-      
-      // 5. 검정 외곽선 (고전 카툰 2D 마리오/플래피 계열 필수 데코)
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(0, groundY);
-      ctx.lineTo(BASE_W, groundY);
-      ctx.stroke();
-
-      // 지면 장식물 그리기
-      drawGroundDecorations(timestamp, 1.0);
+      ctx.drawImage(getGroundStrip(), -(groundOffset % GROUND_PERIOD), groundY, BASE_W + GROUND_PERIOD, GROUND_H);
+      ctx.fillStyle = '#000'; ctx.fillRect(0, groundY - 1, BASE_W, 1.5);
+      drawGroundDecorations(timestamp);
     }
 
     /* ================================================================
@@ -5084,7 +5440,7 @@
           auraSmokePool.release(s); // 수명 다한 연기 반납
           continue;
         }
-        s.x += s.vx; s.y += s.vy; s.vy -= 0.02; s.life -= s.decay;
+        s.x += s.vx * _dtFactor; s.y += s.vy * _dtFactor; s.vy -= 0.02 * _dtFactor; s.life -= s.decay * _dtFactor;
         if (s.grow) s.size *= s.grow;
       }
     }
@@ -5132,235 +5488,149 @@
       }
       // [성능 최적화] 객체 풀에서 활성 연기 가져와 그리기
       const activeSmokes = auraSmokePool.getActive();
-      activeSmokes.forEach(s => {
+      for (let i = 0, len = activeSmokes.length; i < len; i++) {
+        const s = activeSmokes[i];
         ctx.globalAlpha = Math.max(0, s.life * 0.8);
         ctx.fillStyle = s.color;
         ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2); ctx.fill();
-      });
+      }
       if (PERF_CONFIG.shadows) ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
     }
 
     /* ================================================================
-       BIRD
+       BIRD — 꽃돼지 연이 (Yeoni 벡터 렌더러)
        ================================================================ */
-    // [수정] 돼지 이미지 표준 비율 - 모든 에셋에 일괄 적용
-    const PIG_ASPECT = 1.15; // 가로:세로 = 1.15:1
-    const PIG_BASE_SIZE = 70; // 기준 크기
+    // 히트박스 기준 비율 (판정 크기는 기존과 동일하게 유지)
+    const PIG_ASPECT = 1.15;
+    const PIG_BASE_SIZE = 70;
+    const PIG_DRAW_SIZE = 66;      // 캐릭터 100 unit → 66 논리 px
+    const MENU_PIG_DRAW = 77;      // 기존 메뉴 돼지 크기(82px)
+
+    let pigExpr = 'normal', pigExprUntil = 0, nextBlinkAt = 0;
+    function setPigExpression(ex, ms) { pigExpr = ex; pigExprUntil = performance.now() + ms; }
+    function pigExpression(now) {
+      if (crashActive || gameState === STATE.GAMEOVER) return 'hurt';
+      if (now < pigExprUntil) return pigExpr;
+      if (gameState === STATE.PLAYING && bird.vy > 7.2) return 'surprise';
+      if (now >= nextBlinkAt) {
+        if (now < nextBlinkAt + 140) return 'blink';
+        nextBlinkAt = now + 2200 + Math.random() * 2800;
+      }
+      return 'normal';
+    }
 
     function initBird() {
       bird = {
-        x: BIRD_X, y: BASE_H * 0.44,
+        x: BIRD_X, y: BASE_H * 0.44, baseY: BASE_H * 0.44,
         vy: 0, width: PIG_BASE_SIZE, height: PIG_BASE_SIZE / PIG_ASPECT,
-        rotation: 0, wingPhase: 0, floatPhase: 0,
+        rotation: 0, wingPhase: 0, floatPhase: 0, flapBoost: 0,
         ghostTrail: []
       };
     }
 
     function updateBird() {
-      // ── 델타 타임 적용 물리 ──
-      bird.vy += GRAVITY * _dtFactor;
-      bird.vy = Math.min(bird.vy, MAX_FALL_VEL);
+      bird.vy += DIFF.gravity * _dtFactor;
+      bird.vy = Math.min(bird.vy, DIFF.maxFall);
       bird.y += bird.vy * _dtFactor;
 
-      if (isNaN(bird.y)) { bird.y = BASE_H * 0.44; bird.vy = 0; }
-      if (isNaN(bird.vy)) { bird.vy = 0; }
+      if (!isFinite(bird.y)) { bird.y = BASE_H * 0.44; bird.vy = 0; }
+      if (!isFinite(bird.vy)) { bird.vy = 0; }
 
-      const tgt = Math.max(-0.38, Math.min(Math.PI / 2, bird.vy * 0.095));
+      // 귀여운 캐릭터라 수직 낙하(90°) 대신 최대 ~60° 까지만 숙임
+      const tgt = Math.max(-0.38, Math.min(1.05, bird.vy * 0.095));
       bird.rotation += (tgt - bird.rotation) * 0.13 * _dtFactor;
-      bird.wingPhase += (boltActive ? 0.26 : 0.16) * _dtFactor;
+      bird.wingPhase += ((boltActive ? 0.3 : 0.17) + bird.flapBoost * 0.5) * _dtFactor;
+      bird.flapBoost *= Math.pow(0.88, _dtFactor);
       bird.floatPhase += 0.09 * _dtFactor;
 
       if (boltActive) {
-        bird.ghostTrail.unshift({ x: bird.x, y: bird.y, life: 1 });
-        if (bird.ghostTrail.length > 8) bird.ghostTrail.pop();
-        // [최적화] forEach → for 루프
-        for (let i = 0; i < bird.ghostTrail.length; i++) {
-          bird.ghostTrail[i].life -= 0.13 * _dtFactor;
+        if ((frameCount & 1) === 0) {
+          bird.ghostTrail.unshift({ x: bird.x, y: bird.y, life: 1 });
+          if (bird.ghostTrail.length > 5) bird.ghostTrail.pop();
         }
-      } else if (bird.ghostTrail.length > 0) { bird.ghostTrail = []; }
+        for (let i = 0; i < bird.ghostTrail.length; i++) bird.ghostTrail[i].life -= 0.11 * _dtFactor;
+      } else if (bird.ghostTrail.length > 0) { bird.ghostTrail.length = 0; }
 
       altitude += altitudeSpeed * (boltActive ? 1.8 : 1) * _dtFactor;
     }
 
-    function drawSpriteFrame(frame, dx, dy, dw, dh) {
-      if (!pigSprite.complete || !pigSprite.naturalWidth) return false;
-      const rawSw = pigSprite.naturalWidth / SPRITE_COLS;
-      const rawSh = pigSprite.naturalHeight / SPRITE_ROWS;
-      // [수정] 보더를 2로 늘려 회색 테두리 완전 제거
-      const border = 2;
-      const sx = (frame % SPRITE_COLS) * rawSw + border;
-      const sy = Math.floor(frame / SPRITE_COLS) * rawSh + border;
-      const sWidth = Math.max(1, rawSw - border * 2);
-      const sHeight = Math.max(1, rawSh - border * 2);
-
-      ctx.save();
-      // [신규] 클리핑 패스로 이미지 영역 제한 - 테두리 완전 제거
-      ctx.beginPath();
-      const clipPadding = 1; // 추가 여유
-      ctx.ellipse(dx + dw * 0.5, dy + dh * 0.5, dw * 0.48 - clipPadding, dh * 0.45 - clipPadding, 0, 0, Math.PI * 2);
-      ctx.clip();
-
-      // [수정] 이미지 스무딩 비활성화로 선명한 가장자리
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(pigSprite,
-        Math.round(sx), Math.round(sy), Math.round(sWidth), Math.round(sHeight),
-        Math.round(dx), Math.round(dy), Math.round(dw), Math.round(dh));
-      ctx.restore();
-      return true;
+    // READY: 제자리에서 둥실둥실 날갯짓
+    function updateBirdHover() {
+      bird.wingPhase += 0.2 * _dtFactor;
+      bird.floatPhase += 0.05 * _dtFactor;
+      bird.y = bird.baseY + Math.sin(bird.floatPhase * 1.6) * 8;
+      bird.rotation += (-0.08 - bird.rotation) * 0.1 * _dtFactor;
+    }
+    // GAMEOVER: 살짝 튀었다가 바닥으로 떨어짐
+    function updateBirdFall() {
+      const floor = BASE_H - GROUND_H - bird.height * 0.34;
+      if (bird.y < floor) {
+        bird.vy = Math.min(bird.vy + DIFF.gravity * 1.1 * _dtFactor, 12);
+        bird.y = Math.min(floor, bird.y + bird.vy * _dtFactor);
+        bird.rotation += (1.15 - bird.rotation) * 0.07 * _dtFactor;
+      }
     }
 
     function drawBird() {
-      // [디버그] 버그 방지 - bird 위치 검증
-      if (!bird || typeof bird.x !== 'number' || typeof bird.y !== 'number' ||
-        isNaN(bird.x) || isNaN(bird.y)) {
-        console.error('[BUG] Invalid bird position:', bird);
-        initBird(); // 위치 초기화
-        return;
-      }
-
+      if (!bird || !isFinite(bird.x) || !isFinite(bird.y)) { initBird(); return; }
       const bx = bird.x, by = bird.y;
-      // [수정] 표준 비율 적용 - 모든 돼지 이미지 일관성 유지
       const bw = PIG_BASE_SIZE, bh = PIG_BASE_SIZE / PIG_ASPECT;
-      const fi = Math.floor(bird.wingPhase) % TOTAL_FRAMES;
-      const frame = ANIM_SEQ[fi];
-
-      // [성능 최적화] Date.now() 한 번만 호출
       const now = Date.now();
+      const wf = bird.wingPhase * 2;
 
-      // [디버그] 프레임 인덱스 검증
-      if (frame < 0 || frame >= TOTAL_FRAMES) {
-        console.error('[BUG] Invalid frame index:', frame, 'fi:', fi);
-      }
-
-      // Ghost trail (bolt) - 표준 비율 적용
-      // [최적화] boltActive일 때만 그리기, save/restore 최소화
-      if (boltActive && bird.ghostTrail.length > 0) {
-        bird.ghostTrail.forEach((g, i) => {
-          if (g.life <= 0) return;
-          ctx.save();
-          ctx.globalAlpha = g.life * 0.32;
-          ctx.translate(g.x, g.y); ctx.rotate(bird.rotation);
-          ctx.shadowColor = '#4af0f0'; ctx.shadowBlur = 14;
-          const gf = ANIM_SEQ[Math.floor(bird.wingPhase - i * 0.5) % TOTAL_FRAMES];
-          // [수정] 표준 비율 유지 + 클리핑으로 테두리 제거
-          const gw = PIG_BASE_SIZE, gh = PIG_BASE_SIZE / PIG_ASPECT;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, gw * 0.48, gh * 0.45, 0, 0, Math.PI * 2);
-          ctx.clip();
-          drawSpriteFrame(gf, -gw * 0.5, -gh * 0.5, gw, gh);
-          ctx.restore();
-        });
-      }
-
-      // Lotus shield glow
-      if (lotusActive) {
-        const rem = (lotusEnd - now) / LOTUS_DURATION;
-        const blink = rem < 0.2 ? (Math.sin(now * 0.025) > 0 ? 1 : 0) : 1;
-        ctx.save(); ctx.translate(bx, by);
-        ctx.globalAlpha = 0.38 * blink;
-        // [최적화] 그라데이션 캐싱 가능성 (현재는 매 프레임 생성)
-        const sg = ctx.createRadialGradient(0, 0, bw * 0.25, 0, 0, bw * 0.95);
-        sg.addColorStop(0, 'rgba(255,215,0,0.05)'); sg.addColorStop(0.6, 'rgba(255,215,0,0.45)'); sg.addColorStop(1, 'rgba(255,180,80,0.05)');
-        ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, bw * 0.95, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = `rgba(255,215,0,${0.85 * blink})`; ctx.lineWidth = 2.5;
-        // [최적화] 그림자 효과는 고성능 기기에서만
-        if (!isLowEnd) {
-          ctx.shadowColor = 'rgba(255,215,0,0.8)'; ctx.shadowBlur = 18;
+      // 기운상승 잔상
+      if (boltActive) {
+        for (let i = bird.ghostTrail.length - 1; i >= 0; i--) {
+          const g = bird.ghostTrail[i];
+          if (g.life > 0) Yeoni.draw(ctx, g.x - (i + 1) * 6, g.y, PIG_DRAW_SIZE, bird.rotation, 'normal', wf - i, g.life * 0.28);
         }
-        ctx.beginPath(); ctx.arc(0, 0, bw * 0.88, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
       }
 
-      // [신규] 무적 모드 효과 (천사 광환)
+      // 황금연꽃 보호막
+      if (lotusActive) {
+        const rem = (lotusEnd - now) / lotusTotal;
+        const blink = rem < 0.2 ? (Math.sin(now * 0.025) > 0 ? 1 : 0.25) : 1;
+        drawGlow('gold', GLOW.gold, bx, by, bw * 1.0, 0.95 * blink);
+        ctx.strokeStyle = `rgba(255,215,0,${0.85 * blink})`; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(bx, by, bw * 0.86, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      // 천사(무적) 모드 광환
       if (godModeActive) {
-        const time = Date.now() * 0.002;
+        const time = now * 0.002;
         const pulse = 0.7 + Math.sin(time) * 0.3;
-        ctx.save(); ctx.translate(bx, by);
-        ctx.globalAlpha = 0.45 * pulse;
-        // 황금빛 이중 광환
-        const gg1 = ctx.createRadialGradient(0, 0, bw * 0.3, 0, 0, bw * 1.1);
-        gg1.addColorStop(0, 'rgba(255,215,0,0.1)');
-        gg1.addColorStop(0.5, 'rgba(255,180,60,0.35)');
-        gg1.addColorStop(1, 'rgba(255,100,100,0)');
-        ctx.fillStyle = gg1; ctx.beginPath(); ctx.arc(0, 0, bw * 1.1, 0, Math.PI * 2); ctx.fill();
-        // 외부 고리
-        ctx.globalAlpha = 0.6 * pulse;
+        drawGlow('angel', GLOW.angel, bx, by, bw * 1.1, 0.5 * pulse);
         ctx.strokeStyle = `rgba(255,215,0,${0.7 * pulse})`; ctx.lineWidth = 3;
-        ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 20 * pulse;
-        ctx.beginPath(); ctx.arc(0, 0, bw * 0.95, 0, Math.PI * 2); ctx.stroke();
-        // 내부 고리
+        ctx.beginPath(); ctx.arc(bx, by, bw * 0.95, 0, Math.PI * 2); ctx.stroke();
         ctx.strokeStyle = `rgba(255,150,80,${0.5 * pulse})`; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, bw * 0.75, 0, Math.PI * 2); ctx.stroke();
-        // 작은 별들 주변 회전
+        ctx.beginPath(); ctx.arc(bx, by, bw * 0.75, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#ffd700';
         for (let i = 0; i < 4; i++) {
           const a = time * 0.5 + i * Math.PI / 2;
-          const sx = Math.cos(a) * bw * 0.7;
-          const sy = Math.sin(a) * bh * 0.6;
-          ctx.fillStyle = '#ffd700';
-          ctx.shadowBlur = 10;
-          ctx.beginPath(); ctx.arc(sx, sy, 3 * pulse, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.restore();
-      }
-
-      // Main pig body
-      ctx.save();
-      const floatY = Math.sin(bird.floatPhase) * 2;
-      ctx.translate(bx, by + floatY); ctx.rotate(bird.rotation);
-      ctx.imageSmoothingEnabled = false;
-      if (crashActive && pigCrash.complete && pigCrash.naturalWidth) {
-        // [수정] 클리핑 패스로 테두리 제거
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(0, 0, bw * 0.48, bh * 0.45, 0, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(pigCrash, -bw * 0.5, -bh * 0.5, bw, bh);
-        ctx.restore();
-      } else if (winkActive && pigWink.complete && pigWink.naturalWidth) {
-        // [수정] 클리핑 패스로 테두리 제거
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(0, 0, bw * 0.48, bh * 0.45, 0, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(pigWink, -bw * 0.5, -bh * 0.5, bw, bh);
-        ctx.restore();
-      } else {
-        const drawn = drawSpriteFrame(frame, -bw * 0.5, -bh * 0.5, bw, bh);
-        // [수정] 스프라이트 로드 실패시에도 항상 표시
-        if (!drawn) {
-          ctx.fillStyle = '#ffb6c1';
-          ctx.strokeStyle = '#ff69b4'; ctx.lineWidth = 2;
-          // [수정] 표준 비율의 타원
-          ctx.beginPath(); ctx.ellipse(0, 0, bw * 0.5, bh * 0.45, 0, 0, Math.PI * 2);
-          ctx.fill(); ctx.stroke();
-          // 눈과 코 표시
-          ctx.fillStyle = '#333';
-          ctx.beginPath(); ctx.arc(bw * 0.15, -bh * 0.1, 3, 0, Math.PI * 2); ctx.fill();
-          ctx.beginPath(); ctx.arc(bw * 0.25, -bh * 0.08, 2, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(bx + Math.cos(a) * bw * 0.7, by + Math.sin(a) * bh * 0.6, 3 * pulse, 0, Math.PI * 2); ctx.fill();
         }
       }
-      ctx.restore();
 
-      // Bolt effect ring
+      // 연이 본체
+      const floatY = gameState === STATE.PLAYING ? Math.sin(bird.floatPhase) * 2 : 0;
+      Yeoni.draw(ctx, bx, by + floatY, PIG_DRAW_SIZE, bird.rotation, pigExpression(performance.now()), wf);
+
       if (boltActive) {
-        ctx.save(); ctx.translate(bx, by);
-        ctx.globalAlpha = 0.45 + Math.sin(Date.now() * 0.016) * 0.3;
-        ctx.shadowColor = '#4af0f0'; ctx.shadowBlur = 22;
+        drawGlow('cyan', GLOW.cyan, bx, by, bw * 0.85, 0.9);
+        ctx.globalAlpha = 0.45 + Math.sin(now * 0.016) * 0.3;
         ctx.strokeStyle = '#4af0f0'; ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.arc(0, 0, bw * 0.62, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
+        ctx.beginPath(); ctx.arc(bx, by, bw * 0.62, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
       }
-
-      // Clover 2x glow
       if (cloverActive) {
-        ctx.save(); ctx.translate(bx, by);
-        ctx.globalAlpha = 0.25 + Math.sin(Date.now() * 0.01) * 0.15;
-        ctx.shadowColor = '#7fff7f'; ctx.shadowBlur = 20;
+        drawGlow('green', GLOW.green, bx, by, bw * 0.85, 0.7);
+        ctx.globalAlpha = 0.35 + Math.sin(now * 0.01) * 0.15;
         ctx.strokeStyle = '#7fff7f'; ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
-        ctx.beginPath(); ctx.arc(0, 0, bw * 0.7, 0, Math.PI * 2); ctx.stroke();
-        ctx.restore();
+        ctx.beginPath(); ctx.arc(bx, by, bw * 0.7, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
       }
     }
 
@@ -5376,11 +5646,12 @@
       const baseGap = getPipeGap();
       // [수정] 파이프 갭에 변동 추가 - 가끔 더 좁은 갭 (10% 확률로 12px 좁게)
       const gap = Math.random() < 0.10 ? Math.max(115, baseGap - 12) : baseGap;
-      const gapY = rand(120, BASE_H - GROUND_H - gap - 110);
+      const gapY = rand(110, BASE_H - GROUND_H - gap - 100);
 
       // [수정] 검은 오오라는 우주(레벨 4)부터만 등장
+      // [난이도] 모드별 오오라 등장 레벨 (꽃잎=우주, 열정=성층권, 전설=구름)
       let auraRate = 0;
-      if (level >= 4) auraRate = 0.45; // 우주+: 45%
+      if (level >= DIFF.auraFrom) auraRate = level >= 4 ? 0.45 : 0.3;
 
       const isAura = Math.random() < auraRate;
       const obstacleType = isAura ? (Math.random() < 0.5 ? 1 : 2) : 0;
@@ -5392,6 +5663,7 @@
       else if (level >= 3) moveChance = 0.40; // 성층권: 40% (조정)
       else if (level >= 2) moveChance = 0.25; // 구름: 25%
 
+      moveChance = Math.min(0.92, moveChance * DIFF.moveScale + (DIFF.moveScale > 1 && level === 1 ? 0.1 : 0));
       const moveDir = Math.random() < moveChance ? (Math.random() < 0.5 ? 1 : -1) : 0;
 
       // [수정] 레벨별 움직임 강도 (캡 적용)
@@ -5416,240 +5688,85 @@
       pipe.moveLim = rand(moveLimBase, moveLimBase + 40);
     }
 
-    // ── [슈퍼마리오 스타일] 피파이프 그리기 ──
-    // ── [고급형] 테마 에테르 기둥 그리기 ──
-    function drawThemePillar(x, gapTop, gapBottom, time) {
+    // ── 테마 기둥 (슈퍼마리오 스타일) — [성능] 몸통 슬라이스/머리 캡을 캐시해 drawImage 로 그림 ──
+    const PIPE_THEMES = {
+      1: { base: '#52d22d', hi: '#94f475', hiStrong: '#cdf7c1', shadow: '#247a11' },
+      2: { base: '#e28743', hi: '#ffb27f', hiStrong: '#ffd1b2', shadow: '#964b1c' },
+      3: { base: '#9b59b6', hi: '#c38cd4', hiStrong: '#debadd', shadow: '#5c2d6e' },
+      4: { base: '#5ca2ce', hi: '#99cae6', hiStrong: '#c9e2f0', shadow: '#2c5a75' }
+    };
+    const PIPE_CAP_H = 24, PIPE_CAP_W = PIPE_W + 10, PIPE_PAD = 2;
+    let _pipeSprites = null, _pipeKey = '';
+    function paintPipeSegment(g, pt, w, h, edges) {
+      g.fillStyle = pt.base; g.fillRect(0, 0, w, h);
+      g.fillStyle = pt.hi; g.fillRect(w * 0.1, 0, w * 0.15, h);
+      g.fillStyle = pt.hiStrong; g.fillRect(w * 0.15, 0, w * 0.05, h);
+      g.fillStyle = pt.shadow; g.fillRect(w * 0.7, 0, w * 0.3, h);
+      g.strokeStyle = '#0a0a0a'; g.lineWidth = 2.5;
+      if (edges) g.strokeRect(0, 0, w, h);
+      else { g.beginPath(); g.moveTo(0, -2); g.lineTo(0, h + 2); g.moveTo(w, -2); g.lineTo(w, h + 2); g.stroke(); }
+    }
+    function getPipeSprites() {
+      const theme = Math.min(level, 4);
+      const key = theme + ':' + _renderCacheGen;
+      if (_pipeSprites && _pipeKey === key) return _pipeSprites;
+      const res = cacheRes(), pt = PIPE_THEMES[theme];
+      const body = makeCanvas((PIPE_W + PIPE_PAD * 2) * res, 4 * res);
+      let g = body.getContext('2d'); g.scale(res, res); g.translate(PIPE_PAD, 0);
+      paintPipeSegment(g, pt, PIPE_W, 4, false);
+      const cap = makeCanvas((PIPE_CAP_W + PIPE_PAD * 2) * res, (PIPE_CAP_H + PIPE_PAD * 2) * res);
+      g = cap.getContext('2d'); g.scale(res, res); g.translate(PIPE_PAD, PIPE_PAD);
+      paintPipeSegment(g, pt, PIPE_CAP_W, PIPE_CAP_H, true);
+      _pipeSprites = { body, cap }; _pipeKey = key;
+      return _pipeSprites;
+    }
+    function drawThemePillar(x, gapTop, gapBottom) {
+      const { body, cap } = getPipeSprites();
       const groundY = BASE_H - GROUND_H;
-      const pw = PIPE_W;
-      ctx.save();
-
-      // 스테이지별 테마 컬러 및 설정
-      const themes = {
-        1: { base: 'rgba(120, 200, 100,', accent: '#fff', pattern: 'vine' },
-        2: { base: 'rgba(230, 160, 80,', accent: '#ffd700', pattern: 'sand' },
-        3: { base: 'rgba(160, 100, 255,', accent: '#00f2ff', pattern: 'neon' },
-        4: { base: 'rgba(100, 100, 140,', accent: '#e0e0ff', pattern: 'crystal' },
-        5: { base: 'rgba(255, 100, 100,', accent: '#fff', pattern: 'energy' }
-      };
-
-      const t = themes[Math.min(level, 5)] || themes[1];
-
-      function drawPillarPart(px, py, ph, isBottom) {
-        if (ph <= 0) return;
-
-        // [슈퍼 마리오 스타일] 파이프 테마 (Super Mario Pipe Style)
-        const capHeight = 24;
-        const capWidth = pw + 10;
-        const capX = px - 5;
-        
-        let bodyY = py;
-        let bodyH = ph;
-        let capY = isBottom ? py : py + ph - capHeight;
-
-        if (isBottom) {
-            bodyY = py + capHeight;
-            bodyH = ph - capHeight;
-        } else {
-            bodyH = ph - capHeight;
-        }
-
-        // 스테이지 테마 파이프 컬러 매칭
-        const pipeThemes = {
-            1: { base: '#52d22d', hi: '#94f475', hiStrong: '#cdf7c1', shadow: '#247a11' }, // 초록 (초원)
-            2: { base: '#e28743', hi: '#ffb27f', hiStrong: '#ffd1b2', shadow: '#964b1c' }, // 오렌지 (사막)
-            3: { base: '#9b59b6', hi: '#c38cd4', hiStrong: '#debadd', shadow: '#5c2d6e' }, // 보라 (사이버)
-            4: { base: '#5ca2ce', hi: '#99cae6', hiStrong: '#c9e2f0', shadow: '#2c5a75' }  // 파랑 (빈티지 퓨처/달)
-        };
-        const pt = pipeThemes[Math.min(level, 4)] || pipeThemes[1];
-
-        const cBase = pt.base; 
-        const cHi = pt.hi;
-        const cHiStrong = pt.hiStrong;
-        const cShadow = pt.shadow;
-
-        function drawPipeSegment(x, y, w, h) {
-            // 기본 베이스
-            ctx.fillStyle = cBase;
-            ctx.fillRect(x, y, w, h);
-            
-            // 왼쪽 하이라이트
-            ctx.fillStyle = cHi;
-            ctx.fillRect(x + w * 0.1, y, w * 0.15, h);
-            ctx.fillStyle = cHiStrong;
-            ctx.fillRect(x + w * 0.15, y, w * 0.05, h);
-
-            // 오른쪽 그림자
-            ctx.fillStyle = cShadow;
-            ctx.fillRect(x + w * 0.7, y, w * 0.3, h);
-
-            // 검정 테두리 (깔끔한 카툰 느낌)
-            ctx.strokeStyle = '#0a0a0a';
-            ctx.lineWidth = 2.5;
-            ctx.strokeRect(x, y, w, h);
-        }
-
-        // 몸통 그리기
-        if (bodyH > 0) {
-            drawPipeSegment(px, bodyY, pw, bodyH);
-        }
-        
-        // 머리(Cap) 그리기
-        drawPipeSegment(capX, capY, capWidth, capHeight);
+      const bw = PIPE_W + PIPE_PAD * 2, cw = PIPE_CAP_W + PIPE_PAD * 2, ch = PIPE_CAP_H + PIPE_PAD * 2;
+      if (gapTop > 0) {
+        const bodyH = gapTop - PIPE_CAP_H;
+        if (bodyH > 0) ctx.drawImage(body, x - PIPE_PAD, 0, bw, bodyH);
+        ctx.drawImage(cap, x - 5 - PIPE_PAD, gapTop - PIPE_CAP_H - PIPE_PAD, cw, ch);
       }
-
-      drawPillarPart(x, 0, gapTop, false);
-      drawPillarPart(x, gapBottom, groundY - gapBottom, true);
-      ctx.restore();
+      const h = groundY - gapBottom;
+      if (h > 0) {
+        const bodyH = h - PIPE_CAP_H;
+        if (bodyH > 0) ctx.drawImage(body, x - PIPE_PAD, gapBottom + PIPE_CAP_H, bw, bodyH);
+        ctx.drawImage(cap, x - 5 - PIPE_PAD, gapBottom - PIPE_PAD, cw, ch);
+      }
     }
 
-    // ── 어둠의 오오라 (클린 디자인) ──
-    function drawDarkAura(x, gapTop, gapBottom, time) {
-      const groundY = BASE_H - GROUND_H;
-      const cx = x + PIPE_W / 2;
-      ctx.save();
-
-      // [클린] 통일된 색상 팔레트
-      const coreColor = '180, 140, 220';
-      const glowColor = '140, 100, 180';
-      const pulse = 0.9 + Math.sin(time * 2) * 0.1;
+    // ── 어둠의 오오라 / 혼돈 오오라 — 그라데이션을 캐시 스프라이트로 대체 ──
+    function drawAuraPart(midX, midY, ah, isChaos, time) {
+      const pulse = 0.9 + Math.sin(time * (isChaos ? 2.5 : 2)) * 0.1;
+      const auraR = Math.min(ah, isChaos ? 100 : 80) * 0.5 * pulse;
+      if (auraR <= 10) return;
       const alpha = 0.5 * pulse;
-
-      function drawSingleAura(ax, ay, aw, ah, isTop) {
-        if (ah <= 0) return;
-        const midX = ax + aw / 2, midY = ay + ah / 2;
-        const auraR = Math.min(ah, 80) * 0.5 * pulse;
-
-        if (auraR > 10) {
-          // [클린] 글로우 레이어 제거 (심플 실루엣 유지)
-          /*
-          const g = ctx.createRadialGradient(midX, midY, 0, midX, midY, auraR);
-          g.addColorStop(0, `rgba(${coreColor}, 0)`);
-          g.addColorStop(0.6, `rgba(${glowColor}, ${alpha * 0.5})`);
-          g.addColorStop(1, 'transparent');
-
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.arc(midX, midY, auraR, 0, Math.PI * 2);
-          ctx.fill();
-          */
-
-          // [클린] 정돈된 핵심
-          const coreR = 22;
-          const cg = ctx.createRadialGradient(midX, midY, 0, midX, midY, coreR);
-          cg.addColorStop(0, `rgba(${coreColor}, ${alpha * 1.3})`);
-          cg.addColorStop(0.7, `rgba(${glowColor}, ${alpha * 0.8})`);
-          cg.addColorStop(1, `rgba(${glowColor}, 0)`);
-
-          ctx.fillStyle = cg;
-          ctx.beginPath();
-          ctx.arc(midX, midY, coreR, 0, Math.PI * 2);
-          ctx.fill();
-
-          // [클린] 중앙 포인트
-          ctx.fillStyle = `rgba(${coreColor}, ${alpha * 1.5})`;
-          ctx.beginPath();
-          ctx.arc(midX, midY, 8, 0, Math.PI * 2);
-          ctx.fill();
-
-          // [클린] 외곽선
-          ctx.strokeStyle = `rgba(${glowColor}, ${0.3 + Math.sin(time * 3) * 0.1})`;
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(midX, midY, auraR * 0.8, 0, Math.PI * 2);
-          ctx.stroke();
-        }
+      drawGlow(isChaos ? 'auraChaos' : 'auraDark', isChaos ? GLOW.auraChaos : GLOW.auraDark, midX, midY, isChaos ? 28 : 22, pulse);
+      ctx.fillStyle = isChaos ? `rgba(255,100,150,${alpha * 1.4})` : `rgba(180,140,220,${alpha * 1.5})`;
+      ctx.beginPath(); ctx.arc(midX, midY, isChaos ? 10 : 8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = isChaos ? `rgba(220,80,120,${0.25 + Math.sin(time * 4) * 0.1})` : `rgba(140,100,180,${0.3 + Math.sin(time * 3) * 0.1})`;
+      ctx.lineWidth = isChaos ? 2 : 1.5;
+      ctx.beginPath(); ctx.arc(midX, midY, auraR * (isChaos ? 0.85 : 0.8), 0, Math.PI * 2); ctx.stroke();
+      if (isChaos) {
+        ctx.strokeStyle = 'rgba(220,80,120,0.2)'; ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.arc(midX, midY, auraR * 0.6, time, time + Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
       }
-
-      if (gapTop > 0) drawSingleAura(x, 0, PIPE_W, gapTop, false);
-      if (gapBottom < groundY) drawSingleAura(x, gapBottom, PIPE_W, groundY - gapBottom, true);
-
-      ctx.restore();
     }
-
-    // ── 혼돈 오오라 (클린 디자인) ──
-    function drawChaosAura(x, gapTop, gapBottom, time) {
+    function drawAuraObstacle(x, gapTop, gapBottom, time, isChaos) {
       const groundY = BASE_H - GROUND_H;
-      ctx.save();
-
-      // [클린] 통일된 색상 팔레트 (분홍/빨강 톤)
-      const coreColor = '255, 100, 150';
-      const glowColor = '220, 80, 120';
-      const pulse = 0.9 + Math.sin(time * 2.5) * 0.1;
-      const alpha = 0.5 * pulse;
-
-      function drawSingleAura(ax, ay, aw, ah, isTop) {
-        if (ah <= 0) return;
-        const midX = ax + aw / 2, midY = ay + ah / 2;
-        const auraR = Math.min(ah, 100) * 0.5 * pulse;
-
-        if (auraR > 10) {
-          // [클린] 글로우 레이어 제거
-          /*
-          const g = ctx.createRadialGradient(midX, midY, 0, midX, midY, auraR);
-          g.addColorStop(0, `rgba(${coreColor}, 0)`);
-          g.addColorStop(0.5, `rgba(${glowColor}, ${alpha * 0.4})`);
-          g.addColorStop(1, 'transparent');
-
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.arc(midX, midY, auraR, 0, Math.PI * 2);
-          ctx.fill();
-          */
-
-          // [클린] 정돈된 핵심
-          const coreR = 28;
-          const cg = ctx.createRadialGradient(midX, midY, 0, midX, midY, coreR);
-          cg.addColorStop(0, `rgba(${coreColor}, ${alpha * 1.2})`);
-          cg.addColorStop(0.6, `rgba(${glowColor}, ${alpha * 0.7})`);
-          cg.addColorStop(1, `rgba(${glowColor}, 0)`);
-
-          ctx.fillStyle = cg;
-          ctx.beginPath();
-          ctx.arc(midX, midY, coreR, 0, Math.PI * 2);
-          ctx.fill();
-
-          // [클린] 중앙 포인트
-          ctx.fillStyle = `rgba(${coreColor}, ${alpha * 1.4})`;
-          ctx.beginPath();
-          ctx.arc(midX, midY, 10, 0, Math.PI * 2);
-          ctx.fill();
-
-          // [클린] 외곽선
-          ctx.strokeStyle = `rgba(${glowColor}, ${0.25 + Math.sin(time * 4) * 0.1})`;
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(midX, midY, auraR * 0.85, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // [클린] 중앙 연결 라인
-          ctx.strokeStyle = `rgba(${glowColor}, 0.2)`;
-          ctx.lineWidth = 1;
-          ctx.setLineDash([5, 5]);
-          ctx.beginPath();
-          ctx.arc(midX, midY, auraR * 0.6, time, time + Math.PI * 2);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-      }
-
-      if (gapTop > 0) drawSingleAura(x, 0, PIPE_W, gapTop, false);
-      if (gapBottom < groundY) drawSingleAura(x, gapBottom, PIPE_W, groundY - gapBottom, true);
-
-      ctx.restore();
+      const midX = x + PIPE_W / 2;
+      if (gapTop > 0) drawAuraPart(midX, gapTop / 2, gapTop, isChaos, time);
+      if (gapBottom < groundY) drawAuraPart(midX, gapBottom + (groundY - gapBottom) / 2, groundY - gapBottom, isChaos, time);
     }
 
     function drawPipe(pipe, timestamp) {
-      const { x, gapTop, gapBottom, obstacleType = 0 } = pipe;
       const time = timestamp * 0.001;
-      ctx.save();
-      if (obstacleType === 0) {
-        drawThemePillar(x, gapTop, gapBottom, time);
-      } else if (obstacleType === 1) {
-        drawDarkAura(x, gapTop, gapBottom, time);
-      } else {
-        drawChaosAura(x, gapTop, gapBottom, time);
-      }
-      ctx.restore();
+      if (pipe.obstacleType === 0) drawThemePillar(pipe.x, pipe.gapTop, pipe.gapBottom);
+      else drawAuraObstacle(pipe.x, pipe.gapTop, pipe.gapBottom, time, pipe.obstacleType === 2);
     }
 
     function updatePipes(timestamp) {
@@ -5680,10 +5797,13 @@
 
           // ── [신규] 파이프 통과 파티클 버스트 ──
           spawnPipeClearBurst(BIRD_X, (pipe.gapTop + pipe.gapBottom) / 2);
+          if (performance.now() > pigExprUntil) setPigExpression('happy', 360);
 
           const nl = calcLevel(score);
           if (nl > level) {
+            bgFade = { from: bgLevelOf(level), start: performance.now() };
             prevLevel = level; level = nl;
+            _hudProgressLast = -1;
             if (level >= 3) initStars();
             spawnLevelUpEffect(level);
             // [수정] 고도 속도 - 레벨 4(우주)에서 100km 도달하도록 대폭 증가
@@ -5692,11 +5812,7 @@
             const stageNames = { 2: '🌤 구름 위로!', 3: '🌌 성층권 돌파!', 4: '🚀 우주 진입!', 5: '♾️ 무한의 경계!' };
             if (stageNames[level]) spawnTextParticle(stageNames[level], BASE_W * 0.5, BASE_H * 0.35, '#ffd700', 22);
           }
-          // [개선] 점수 표시 업데이트 + 애니메이션
-          const scoreEl = document.getElementById('hud-score');
-          scoreEl.textContent = score + '%';
-          scoreEl.classList.add('pop');
-          setTimeout(() => scoreEl.classList.remove('pop'), 150);
+          setHudScore(true);
 
           document.getElementById('hud-level').textContent = `LEVEL ${level}`;
           updateAltitudeHUD();
@@ -5705,7 +5821,7 @@
         // Collision
         // [수정] 무적 모드 또는 연꽃/기운상승 활성화시 충돌 무시
         if (!lotusActive && !boltActive && !godModeActive) {
-          const pad = PIG_PADDING;
+          const pad = DIFF.hitPad;
           const pw = bird.width * (1 - pad * 2), ph = bird.height * (1 - pad * 2);
           const px = bird.x - pw / 2, py = bird.y - ph / 2;
 
@@ -5812,10 +5928,11 @@
       if (_itemSpawnedLastPipe) { _itemSpawnedLastPipe = false; return; }
       // [성능 최적화] 객체 풀의 활성 목록에서 파이프 개수 확인
       const activePipes = pipePool.getActive();
-      if (activePipes.length < 2 || Math.random() > 0.32) return;
+      if (activePipes.length < 2 || Math.random() > DIFF.itemRate) return;
       const last = activePipes[activePipes.length - 1];
       // [수정] 레벨별 가중치 적용
-      const weights = getItemWeights();
+      const weights = getItemWeights().slice();
+      weights[0] *= DIFF.lotusBonus; // 난이도별 황금연꽃 빈도
       const total = weights.reduce((a, b) => a + b, 0);
       let r = Math.random() * total, t = 'bolt';
       let acc = 0;
@@ -5971,10 +6088,11 @@
 
     function collectItem(item, timestamp) {
       winkActive = true; winkEnd = Date.now() + 800;
+      setPigExpression(item.type === 'lotus' ? 'love' : (item.type === 'coin' ? 'happy' : 'wink'), item.type === 'lotus' ? 1300 : 750);
       spawnCollectParticles(item.x, item.y, item.type);
       switch (item.type) {
         case 'lotus':
-          lotusActive = true; lotusEnd = Date.now() + LOTUS_DURATION;
+          lotusActive = true; lotusTotal = LOTUS_DURATION; lotusEnd = Date.now() + LOTUS_DURATION;
           itemCounts.lotus++;
           sndLotus();
           showItemText('🌸 황금연꽃! 무적!', 'lotus');
@@ -6012,17 +6130,15 @@
           itemCounts.coin++;
           sndCoin();
           showItemText('💰福 코인! +5', 'coin');
-          // 점수 표시 업데이트
-          const scoreEl = document.getElementById('hud-score');
-          if (scoreEl) {
-            scoreEl.textContent = score + '%';
-            scoreEl.classList.add('pop');
-            setTimeout(() => scoreEl.classList.remove('pop'), 150);
-          }
+          setHudScore(true);
           break;
       }
     }
 
+    function setTimerBar(id, rem) {
+      // [성능] width(레이아웃) 대신 transform, 4프레임에 한 번만 갱신
+      if ((frameCount & 3) === 0) document.getElementById(id).style.transform = `scaleX(${rem})`;
+    }
     function updateItemTimers() {
       const now = Date.now();
       if (winkActive && now > winkEnd) winkActive = false;
@@ -6030,17 +6146,17 @@
 
       if (lotusActive) {
         const rem = Math.max(0, (lotusEnd - now) / LOTUS_DURATION);
-        document.getElementById('lotus-bar').style.width = (rem * 100) + '%';
+        setTimerBar('lotus-bar', Math.max(0, (lotusEnd - now) / lotusTotal));
         if (now > lotusEnd) { lotusActive = false; document.getElementById('ind-lotus').classList.remove('active'); }
       }
       if (cloverActive) {
         const rem = Math.max(0, (cloverEnd - now) / CLOVER_DURATION);
-        document.getElementById('clover-bar').style.width = (rem * 100) + '%';
+        setTimerBar('clover-bar', rem);
         if (now > cloverEnd) { cloverActive = false; scoreMultiplier = 1; document.getElementById('ind-clover').classList.remove('active'); document.getElementById('mult-badge').classList.remove('active'); }
       }
       if (boltActive) {
         const rem = Math.max(0, (boltEnd - now) / BOLT_DURATION);
-        document.getElementById('bolt-bar').style.width = (rem * 100) + '%';
+        setTimerBar('bolt-bar', rem);
         if (now > boltEnd) { boltActive = false; document.getElementById('ind-bolt').classList.remove('active'); }
       }
 
@@ -6056,8 +6172,7 @@
           if (frameCount % 30 === 0 && score > 0 && auraPoisonTotalReduction < 5) { // 0.5초마다 1점 감소, 최대 5점까지만
             score = Math.max(0, score - 1);
             auraPoisonTotalReduction++;
-            const scoreEl = document.getElementById('hud-score');
-            if (scoreEl) scoreEl.textContent = score;
+            setHudScore(false);
           }
         }
       }
@@ -6083,7 +6198,7 @@
       // [최적화] forEach → for 루프
       for (let i = 0, len = lightParticles.length; i < len; i++) {
         const p = lightParticles[i];
-        p.x += p.sx; p.y += p.sy; p.pulse += 0.022;
+        p.x += p.sx * _dtFactor; p.y += p.sy * _dtFactor; p.pulse += 0.022 * _dtFactor;
         if (p.x < 0) p.x = BASE_W; else if (p.x > BASE_W) p.x = 0;
         if (p.y < 0) p.y = BASE_H; else if (p.y > BASE_H) p.y = 0;
       }
@@ -6111,8 +6226,11 @@
     /* ================================================================
        ALTITUDE HUD
        ================================================================ */
+    let _altLast = '';
     function updateAltitudeHUD() {
       const km = (altitude / 1000).toFixed(1);
+      if (km === _altLast) return; // [성능] 값이 바뀔 때만 DOM 갱신
+      _altLast = km;
       document.getElementById('hud-altitude').textContent = km;
     }
 
@@ -6120,6 +6238,7 @@
        GAME OVER
        ================================================================ */
     /* [전문가형] 점수 카운팅 애니메이션 함수 */
+    let _newRecord = false;
     function animateScore(target, duration = 1200) {
       const el = document.getElementById('go-score');
       const start = 0;
@@ -6138,7 +6257,7 @@
         } else {
           el.textContent = target + '%';
           // 카운팅 완료 후 신기록이면 배지 표시 (애니메이션과 함께)
-          if (target >= bestScore && target > 0) {
+          if (_newRecord) {
             const badge = document.getElementById('new-record-badge');
             badge.style.display = 'block';
             badge.style.animation = 'pulseDream 1s ease-in-out infinite';
@@ -6163,12 +6282,16 @@
       }
 
       crashActive = true; crashEnd = Date.now() + CRASH_DURATION;
+      bird.vy = -4.5; // 충돌 후 살짝 튀어 오르며 떨어짐
+      if (navigator.vibrate && hapticsOn) { try { navigator.vibrate([30, 40, 60]); } catch (e) { } }
       pauseBGM();
+      const prevBest = modeBests[currentDiffId] || 0;
+      const lockedBefore = DIFF_ORDER.filter(id => !isUnlocked(id));
       saveBest();
+      const unlockedNow = lockedBefore.filter(id => isUnlocked(id));
       
       // HUD 숨기기
-      document.getElementById('hud').classList.add('hidden');
-      document.getElementById('hud-altitude-wrap').classList.add('hidden');
+      setHudVisible(false);
       document.getElementById('item-status').style.opacity = '0';
       document.getElementById('mult-badge').classList.remove('active');
 
@@ -6215,9 +6338,15 @@
         document.getElementById('fortune-wealth').textContent = `${fortune.details.wealth.count}개`;
         document.getElementById('fortune-total').textContent = `행운 점수: ${fortune.totalLuck}점`;
 
+        renderRankCard(prevBest, unlockedNow);
+        _newRecord = score > prevBest && score > 0;
+        document.getElementById('new-record-badge').style.display = 'none';
+
         // 화면 표시 및 점수 애니메이션 시작
         document.getElementById('screen-gameover').classList.remove('hidden');
+        _gameOverShown = true;
         animateScore(score);
+        setTimeout(() => { if (gameState === STATE.GAMEOVER) document.getElementById('btn-restart').focus({ preventScroll: true }); }, 400);
       }, delay);
     }
 
@@ -6310,6 +6439,127 @@ if (totalLuck >= 80) {
     }
 
     /* ================================================================
+       [신규] UI — HUD 표시, 난이도 선택, 화질 설정, 결과 등급
+       ================================================================ */
+    const $ = id => document.getElementById(id);
+
+    function setHudVisible(on) {
+      ['hud', 'hud-altitude-wrap'].forEach(id => {
+        const el = $(id);
+        el.classList.toggle('hidden', !on);
+        el.style.display = '';
+      });
+    }
+
+    // HUD 진행도: 현재 스테이지 시작점 → 다음 스테이지까지
+    let _hudProgressLast = -1;
+    function updateHudProgress() {
+      const bar = $('hud-progress-bar');
+      if (!bar) return;
+      let p = 1;
+      if (level < 5) {
+        const from = LVL_THRESHOLDS[level - 1], to = LVL_THRESHOLDS[level];
+        p = Math.max(0, Math.min(1, (score - from) / (to - from)));
+      }
+      const q = Math.round(p * 100);
+      if (q === _hudProgressLast) return;
+      _hudProgressLast = q;
+      bar.style.transform = `scaleX(${p})`;
+      $('hud-next').textContent = level < 5 ? `다음 스테이지까지 ${Math.max(0, LVL_THRESHOLDS[level] - score)}` : '무한 비행 중';
+    }
+    function setHudScore(pop) {
+      const el = $('hud-score');
+      el.textContent = score + '%';
+      if (pop) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+      updateHudProgress();
+    }
+
+    // ── 난이도 선택 ──
+    function renderModePicker() {
+      const wrap = $('mode-picker');
+      if (!wrap) return;
+      wrap.innerHTML = DIFF_ORDER.map(id => {
+        const d = DIFFICULTIES[id];
+        const unlocked = isUnlocked(id);
+        const best = modeBests[id] || 0;
+        const rank = best > 0 ? getRank(best, id).grade : '–';
+        const sel = id === currentDiffId;
+        return `<button type="button" class="mode-opt${sel ? ' selected' : ''}${unlocked ? '' : ' locked'}" role="radio"
+          aria-checked="${sel}" aria-disabled="${!unlocked}" data-mode="${id}" style="--mode:${d.color}">
+          <span class="mode-emoji" aria-hidden="true">${unlocked ? d.emoji : '🔒'}</span>
+          <span class="mode-name">${d.name}</span>
+          <span class="mode-rank" aria-label="최고 등급">${unlocked ? rank : d.tag}</span>
+        </button>`;
+      }).join('');
+      wrap.querySelectorAll('.mode-opt').forEach(btn => btn.addEventListener('click', () => selectMode(btn.dataset.mode, true)));
+      renderModeDetail(currentDiffId);
+    }
+    function renderModeDetail(id, lockedHint) {
+      const d = DIFFICULTIES[id];
+      const el = $('mode-detail');
+      if (!el) return;
+      if (lockedHint) {
+        el.innerHTML = `<span class="mode-detail-lock">🔒 ${d.name} 모드 해금 조건 — <strong>${UNLOCK_RULES[id].hint}</strong> 달성</span>`;
+        el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+        return;
+      }
+      const best = modeBests[id] || 0;
+      const r = getRank(best, id);
+      el.innerHTML = `<span class="mode-detail-desc">${d.desc}</span>
+        <span class="mode-detail-best">최고 <strong>${best}%</strong>${best > 0 ? ` · <b style="color:${r.color}">${r.grade}</b> ${r.title}` : ' · 아직 기록 없음'}</span>`;
+      $('menu-best').textContent = best + '%';
+      const lbl = $('menu-best-mode');
+      if (lbl) lbl.textContent = `${d.emoji} ${d.name}`;
+      const sub = $('btn-start-sub');
+      if (sub) sub.textContent = `${d.emoji} ${d.name} 모드`;
+    }
+    function selectMode(id, fromUser) {
+      if (!DIFFICULTIES[id]) return;
+      if (!isUnlocked(id)) { renderModeDetail(id, true); if (fromUser) beep(220, 'triangle', 0.08, 0.12); return; }
+      currentDiffId = id; DIFF = DIFFICULTIES[id];
+      store.set('pig_difficulty', id);
+      bestScore = modeBests[id] || 0;
+      if (fromUser) { initAudio(); beep(660, 'sine', 0.06, 0.12); }
+      renderModePicker();
+    }
+
+    // ── 화질 설정 (자동 → 고화질 → 절전) ──
+    const QUALITY_LABELS = { auto: '화질 자동', high: '고화질', saver: '절전' };
+    function updateQualityBtn() {
+      const b = $('btn-quality');
+      if (!b) return;
+      b.querySelector('.util-label').textContent = QUALITY_LABELS[qualitySetting];
+      b.setAttribute('aria-label', `그래픽 품질: ${QUALITY_LABELS[qualitySetting]} (눌러서 변경)`);
+    }
+    function cycleQuality() {
+      const order = ['auto', 'high', 'saver'];
+      qualitySetting = order[(order.indexOf(qualitySetting) + 1) % order.length];
+      store.set('pig_quality', qualitySetting);
+      resizeCanvas();
+      initStars(); initLightParticles(); initGroundDecorations(); initButterflies();
+      updateQualityBtn();
+    }
+
+    // ── 결과 화면 등급 카드 ──
+    function renderRankCard(prevBest, unlockedNow) {
+      const r = getRank(score, currentDiffId);
+      const g = $('go-rank-grade');
+      g.textContent = r.grade;
+      g.style.setProperty('--rank', r.color);
+      g.classList.remove('stamp'); void g.offsetWidth; g.classList.add('stamp');
+      $('go-rank-title').textContent = r.title;
+      $('go-rank-sub').textContent = r.next
+        ? `${DIFF.emoji} ${DIFF.name} · 다음 등급 ${r.next.grade}까지 ${Math.ceil(r.toNext / DIFF.rankWeight)}점`
+        : `${DIFF.emoji} ${DIFF.name} · 최고 등급 달성!`;
+      $('go-best').textContent = Math.max(prevBest, score) + '%';
+      const un = $('go-unlock');
+      if (unlockedNow.length) {
+        un.textContent = unlockedNow.map(id => `${DIFFICULTIES[id].emoji} ${DIFFICULTIES[id].name} 모드가 열렸어요!`).join(' ');
+        un.classList.remove('hidden');
+      } else un.classList.add('hidden');
+    }
+
+    /* ================================================================
        START GAME
        ================================================================ */
     function startGame(startingLevel = 1) {
@@ -6321,8 +6571,12 @@ if (totalLuck >= 80) {
       lotusActive = false; cloverActive = false; boltActive = false;
       winkActive = false; crashActive = false;
       lotusEnd = cloverEnd = boltEnd = winkEnd = crashEnd = 0;
-      let auraPoisoned = false, auraPoisonEnd = 0, auraPoisonTotalReduction = 0; // [신규] 오오라 연기 중독 상태 (최대 -5점 제한)
-      auraPoisonTotalReduction = 0; // [신규] 오오라 연기 중독 상태 (최대 -5점 제한)
+      // [버그수정] 지역 변수로 가려져 중독 상태가 초기화되지 않던 문제
+      auraPoisoned = false; auraPoisonEnd = 0; auraPoisonTotalReduction = 0;
+      lotusTotal = LOTUS_DURATION; bgFade.from = 0; _gameOverShown = false; _newRecord = false;
+      _hudProgressLast = -1; _altLast = ''; pigExprUntil = 0;
+      bestScore = modeBests[currentDiffId] || 0;
+      cancelPauseUI();
       itemCounts = { lotus: 0, clover: 0, bolt: 0, coin: 0 }; // [신규] 아이템 카운트 초기화
       // [성능 최적화] 객체 풀 모두 비우기 (게임 리셋)
       // 모든 활성 객체를 풀에 반납하여 메모리 재사용 준비
@@ -6335,13 +6589,16 @@ if (totalLuck >= 80) {
       initBird(); initStars(); initLightParticles(); initGroundDecorations();
       initButterflies(); // [신규] 1스테이지 나비 초기화
 
-      document.getElementById('hud-score').textContent = '0%';
-      document.getElementById('hud-level').textContent = 'LEVEL 1';
+      document.getElementById('hud-level').textContent = `LEVEL ${level}`;
+      document.getElementById('hud-mode').textContent = `${DIFF.emoji} ${DIFF.name}`;
       document.getElementById('hud-altitude').textContent = '0.0';
-      // [수정] 메인 화면과 READY 상태에서는 HUD 숨김
-      // PLAYING 상태로 전환 시 handleJump에서 표시
-      document.getElementById('hud').classList.add('hidden');
-      document.getElementById('hud-altitude-wrap').classList.add('hidden');
+      setHudScore(false);
+      document.getElementById('ready-mode').textContent = `${DIFF.emoji} ${DIFF.name} 모드`;
+      document.getElementById('ready-tip').textContent = DIFF.shieldMs > 0
+        ? `출발하면 ${Math.round(DIFF.shieldMs / 1000)}초 동안 연꽃 보호막이 지켜줘요`
+        : '보호막 없이 시작해요. 첫 기둥부터 집중!';
+      // 메인 화면과 READY 상태에서는 HUD 숨김 (PLAYING 전환 시 handleJump에서 표시)
+      setHudVisible(false);
       document.getElementById('fade-overlay').classList.remove('dark');
       document.getElementById('item-status').style.opacity = '1';
       document.getElementById('ind-lotus').classList.remove('active');
@@ -6353,45 +6610,21 @@ if (totalLuck >= 80) {
       gameState = STATE.READY;
       document.getElementById('ready-overlay').classList.remove('hidden');
       
-      // [신규] 게임 시작 시 레벨 1 스토리 표시
-      setTimeout(() => {
-        showStoryOverlay(1);
-      }, 500);
+      // 게임 시작 시 해당 스테이지 스토리 표시
+      setTimeout(() => { if (gameState === STATE.READY) showStoryOverlay(level); }, 500);
     }
 
     /* ================================================================
        MENU PIG ANIMATION
        ================================================================ */
     let menuPigY = BASE_H * 0.48, menuPigVy = -2.5, menuPigPhase = 0;
-    // [수정] 메뉴 돼지도 표준 비율 적용
-    const MENU_PIG_SIZE = 82;
 
     function drawMenuPig(timestamp) {
-      menuPigVy += 0.07; menuPigY += menuPigVy;
-      if (menuPigY > BASE_H * 0.65 || menuPigY < BASE_H * 0.28) menuPigVy *= -1;
-      menuPigPhase += 0.14;
-      const fi = Math.floor(menuPigPhase) % TOTAL_FRAMES;
-      const frame = ANIM_SEQ[fi];
-      ctx.save(); ctx.translate(BASE_W * 0.26, menuPigY);
-      // [최적화] 전역 설정된 품질 유지
-      // ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-      // [수정] 표준 비율 적용
-      const mw = MENU_PIG_SIZE, mh = MENU_PIG_SIZE / PIG_ASPECT;
-      if (!drawSpriteFrame(frame, -mw * 0.5, -mh * 0.5, mw, mh)) {
-        ctx.fillStyle = '#ffb6c1';
-        // [수정] 표준 비율의 타원
-        ctx.beginPath(); ctx.ellipse(0, 0, mw * 0.5, mh * 0.45, 0, 0, Math.PI * 2); ctx.fill();
-      }
-      // Sparkle trail
-      if (menuPigVy < 0) {
-        ctx.globalAlpha = 0.6;
-        ctx.fillStyle = '#ffb6c1'; ctx.shadowColor = '#ff69b4'; ctx.shadowBlur = 8;
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.arc(rand(-20, 20), rand(10, 30), rand(2, 5), 0, Math.PI * 2); ctx.fill();
-        }
-      }
-      ctx.restore();
+      menuPigVy += 0.07 * _dtFactor; menuPigY += menuPigVy * _dtFactor;
+      if (menuPigY > BASE_H * 0.65) { menuPigY = BASE_H * 0.65; menuPigVy = -Math.abs(menuPigVy); }
+      if (menuPigY < BASE_H * 0.28) { menuPigY = BASE_H * 0.28; menuPigVy = Math.abs(menuPigVy); }
+      menuPigPhase += 0.32 * _dtFactor;
+      Yeoni.draw(ctx, BASE_W * 0.26, menuPigY, MENU_PIG_DRAW, 0, 'normal', menuPigPhase);
     }
 
     /* ================================================================
@@ -6400,33 +6633,34 @@ if (totalLuck >= 80) {
     let frameCounter = 0;
     let _lastFrameTime = 0;
     /**
-     * _dtFactor: 델타 타임 배율.
-     *   1.0 = 60fps 기준. 30Hz → ~2.0, 120Hz → ~0.5
-     *   물리 연산(pipe.x, bird.y 등)에 곱해 기기 주사율과 무관하게
-     *   동일한 '실시간 속도'를 보장한다.
+     * _dtFactor: 델타 타임 배율. 1.0 = 60fps 기준. 30Hz → ~2.0, 120Hz → ~0.5
+     * [버그수정] 프레임 스킵(절전 모드) 시에도 실제 경과 시간을 반영하도록
+     *           스킵 판정 이후에 dt 를 계산 → 저사양에서 게임이 절반 속도로 느려지던 문제 해결
      */
     let _dtFactor = 1;
-    const TARGET_FPS = 60;  // 60fps
-    const FRAME_TIME = 1000 / TARGET_FPS;  // 16.67ms
+    const TARGET_FPS = 60;
+    const FRAME_TIME = 1000 / TARGET_FPS;
+    let _needsRedraw = true;      // 일시정지 중 리사이즈 등으로 다시 그려야 할 때
+    let _gameOverShown = false;
 
     function gameLoop(timestamp) {
       requestAnimationFrame(gameLoop);
+      frameCounter++;
+      if (PERF_CONFIG.frameSkip > 1 && frameCounter % PERF_CONFIG.frameSkip !== 0) return;
+      // 메뉴/결과 화면 뒤 배경은 30fps 로 충분 → 배터리·발열 절약
+      if ((gameState === STATE.MENU || (gameState === STATE.GAMEOVER && _gameOverShown)) && (frameCounter & 1)) return;
+      const paused = gameState === STATE.PAUSED;
+      if (paused && !_needsRedraw) { _lastFrameTime = 0; return; }
 
-      // 델타 타임 계산
-      // · 첫 프레임(_lastFrameTime===0)은 1프레임분(16.67ms)으로 초기화
-      // · 탭 비활성 복귀 등 대형 점프는 최대 3프레임분(50ms)으로 캡
       const rawDt = _lastFrameTime === 0 ? FRAME_TIME : (timestamp - _lastFrameTime);
       _lastFrameTime = timestamp;
-      _dtFactor = Math.min(rawDt, 50) / FRAME_TIME;
+      _dtFactor = paused ? 0 : Math.min(Math.max(rawDt, 1), 50) / FRAME_TIME;
+      _needsRedraw = false;
 
-      frameCounter++;
-      // 저사양 기기: 30fps 강제 (프레임 스킵) — dtFactor와 독립적으로 동작
-      if (PERF_CONFIG.frameSkip > 1 && frameCounter % PERF_CONFIG.frameSkip !== 0) return;
-
+      const playing = gameState === STATE.PLAYING;
       bgOffset += 0.45 * _dtFactor;
-      groundOffset += (gameState === STATE.PLAYING) ? getPipeSpeed() * _dtFactor : 1.2 * _dtFactor;
+      groundOffset += (playing ? getPipeSpeed() : 1.2) * _dtFactor;
 
-      ctx.clearRect(0, 0, BASE_W, BASE_H);
       drawBackground(timestamp);
 
       if (gameState === STATE.MENU) {
@@ -6434,183 +6668,185 @@ if (totalLuck >= 80) {
         return;
       }
 
-      if (gameState === STATE.READY || gameState === STATE.PLAYING || gameState === STATE.GAMEOVER) {
+      if (!paused) {
         if (level >= 3) updateStars();
         updateLightParticles();
-        drawLightParticles(timestamp);
-
-        // [신규] 1스테이지 나비 효과
-        if (level === 1) {
-          updateButterflies();
-          drawButterflies();
-        }
-
-        // Spawn pipes
-        // [수정] READY 상태에서는 파이프 생성 안함 - PLAYING 상태에서만 생성
-        if (gameState === STATE.PLAYING) {
-          // [수정] READY 탭 후 0.5초 지연 후 파이프 생성 시작
-          const timeSincePlaying = timestamp - playingStartTime;
-          if (timeSincePlaying > 500) { // 0.5초 후 파이프 생성 시작
-            // [수정] 파이프 간격에 변동 추가 - 가끔 더 먼 거리
-            const baseInterval = getPipeInterval();
-            const variableInterval = Math.random() < 0.15 ? baseInterval * 1.4 : baseInterval; // 15% 확률로 40% 더 멀리
-            // [수정] 60fps 기준으로 간격 고정 - 속도에 따라 간격 조정 (빠르면 더 자주, 느리면 덜 자주)
-            const speedAdjustedInterval = variableInterval / gameSpeedMultiplier;
-            if (timestamp - lastPipeTime > speedAdjustedInterval) {
-              spawnPipe(timestamp);
-              trySpawnItem();
-              lastPipeTime = timestamp;
-            }
-          }
-        }
-
-        // Aura smokes - [최적화] boltActive일 때는 업데이트 빈도 감소
-        if (!boltActive || frameCount % 2 === 0) {
-          updateAuraSmokes();
-          drawAuraSmokes();
-        }
-
-        // Update game objects
-        // [성능 최적화] 객체 풀에서 활성 객체들을 가져와 업데이트 및 그리기
-        // [최적화] active lists 캐싱 및 forEach → for 루프 변경
-        if (gameState === STATE.PLAYING) { updatePipes(timestamp); }
-        // 파이프 그리기 (활성 목록에서 가져옴)
-        const activePipes = pipePool.getActive();
-        for (let i = 0, len = activePipes.length; i < len; i++) {
-          drawPipe(activePipes[i], timestamp);
-        }
-
-        if (gameState === STATE.PLAYING) { updateItems(timestamp); updateItemTimers(); }
-        // 아이템 그리기 (활성 목록에서 가져옴)
-        const activeItems = itemPool.getActive();
-        for (let i = 0, len = activeItems.length; i < len; i++) {
-          drawItem(activeItems[i], timestamp);
-        }
-
-        if (gameState === STATE.PLAYING) { updateBird(); updateAltitudeHUD(); }
-        drawBird();
-
-        if (gameState === STATE.PLAYING) { updateParticles(); }
-        drawParticles();
-        frameCount++;
       }
+      drawLightParticles(timestamp);
+
+      if (level === 1) {
+        if (!paused) updateButterflies();
+        drawButterflies();
+      }
+
+      // 기둥 생성 (PLAYING 진입 0.5초 후부터)
+      if (playing && timestamp - playingStartTime > 500) {
+        const baseInterval = getPipeInterval();
+        const variableInterval = Math.random() < 0.15 ? baseInterval * 1.4 : baseInterval;
+        if (timestamp - lastPipeTime > variableInterval / gameSpeedMultiplier) {
+          spawnPipe(timestamp);
+          trySpawnItem();
+          lastPipeTime = timestamp;
+        }
+      }
+
+      if (!paused) updateAuraSmokes();
+      drawAuraSmokes();
+
+      if (playing) updatePipes(timestamp);
+      const activePipes = pipePool.getActive();
+      for (let i = 0, len = activePipes.length; i < len; i++) drawPipe(activePipes[i], timestamp);
+
+      if (playing) { updateItems(timestamp); updateItemTimers(); }
+      const activeItems = itemPool.getActive();
+      for (let i = 0, len = activeItems.length; i < len; i++) drawItem(activeItems[i], timestamp);
+
+      if (playing) { updateBird(); updateAltitudeHUD(); }
+      else if (gameState === STATE.READY) updateBirdHover();
+      else if (gameState === STATE.GAMEOVER) updateBirdFall();
+      drawBird();
+
+      if (!paused) updateParticles();
+      drawParticles();
+      if (!paused) frameCount++;
     }
+
+    /* ================================================================
+       PAUSE — 일시정지 / 3·2·1 카운트다운 재개 / 탭 전환 시 자동 정지
+       ================================================================ */
+    let _pauseWall = 0, _pausePerf = 0, _countdownTimer = null;
+    function pauseGame() {
+      if (gameState !== STATE.PLAYING) return;
+      gameState = STATE.PAUSED;
+      _pauseWall = Date.now(); _pausePerf = performance.now();
+      _needsRedraw = true;
+      pauseBGM();
+      document.getElementById('pause-sub').textContent = `${DIFF.emoji} ${DIFF.name} · LEVEL ${level} · ${score}%`;
+      document.getElementById('pause-panel').classList.remove('hidden');
+      document.getElementById('countdown').classList.add('hidden');
+      document.getElementById('screen-pause').classList.remove('hidden');
+      setTimeout(() => document.getElementById('btn-resume').focus({ preventScroll: true }), 50);
+    }
+    function resumeGame() {
+      if (gameState !== STATE.PAUSED || _countdownTimer) return;
+      initAudio();
+      document.getElementById('pause-panel').classList.add('hidden');
+      const cd = document.getElementById('countdown');
+      cd.classList.remove('hidden');
+      let n = 3;
+      const tick = () => {
+        if (gameState !== STATE.PAUSED) { _countdownTimer = null; return; }
+        if (n === 0) {
+          _countdownTimer = null;
+          const dw = Date.now() - _pauseWall, dp = performance.now() - _pausePerf;
+          // 정지해 있던 시간만큼 아이템/중독 타이머와 기둥 스케줄을 뒤로 민다
+          lotusEnd += dw; cloverEnd += dw; boltEnd += dw; winkEnd += dw; crashEnd += dw; auraPoisonEnd += dw;
+          lastPipeTime += dp; playingStartTime += dp;
+          pigExprUntil += dp; nextBlinkAt += dp;
+          _lastFrameTime = 0;
+          document.getElementById('screen-pause').classList.add('hidden');
+          gameState = STATE.PLAYING;
+          playBGM();
+          return;
+        }
+        cd.textContent = n;
+        cd.classList.remove('tick'); void cd.offsetWidth; cd.classList.add('tick');
+        beep(n === 1 ? 880 : 660, 'sine', 0.08, 0.15);
+        n--;
+        _countdownTimer = setTimeout(tick, 550);
+      };
+      tick();
+    }
+    function cancelPauseUI() {
+      if (_countdownTimer) { clearTimeout(_countdownTimer); _countdownTimer = null; }
+      document.getElementById('screen-pause').classList.add('hidden');
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (gameState === STATE.PLAYING) pauseGame();
+        else if (bgmAudio && !bgmAudio.paused) pauseBGM();
+      }
+    });
+    window.addEventListener('blur', () => { if (gameState === STATE.PLAYING && isMobile) pauseGame(); });
 
     /* ================================================================
        INPUT HANDLING
        ================================================================ */
     function handleJump() {
-      // [수정] BGM 상태 보존 - initAudio 호출 시 bgmMuted 유지
       const wasMuted = bgmMuted;
       initAudio();
-      bgmMuted = wasMuted; // BGM 상태 복원
-      // [신규] READY 상태에서 클릭/탭하면 PLAYING으로 전환
+      bgmMuted = wasMuted;
       if (gameState === STATE.READY) {
         gameState = STATE.PLAYING;
-        playingStartTime = performance.now(); // [신규] PLAYING 시작 시간 기록
+        playingStartTime = performance.now();
         document.getElementById('ready-overlay').classList.add('hidden');
-        // [수정] PLAYING 상태로 전환 시 HUD 표시
-        document.getElementById('hud').classList.remove('hidden');
-        document.getElementById('hud').style.display = '';
-        document.getElementById('hud-altitude-wrap').classList.remove('hidden');
-        document.getElementById('hud-altitude-wrap').style.display = '';
-        // [신규] 게임 시작 시 황금 연꽃 효과 적용
-        lotusActive = true;
-        lotusEnd = Date.now() + LOTUS_DURATION;
-        itemCounts.lotus++;
-        sndLotus();
-        showItemText('🌸 시작의 축복! 무적!', 'lotus');
-        document.getElementById('ind-lotus').classList.add('active');
-        // 첫 점프 실행
-        bird.vy = JUMP_FORCE;
-        sndJump();
-        spawnPollenEffect(bird.x, bird.y);
-        if (navigator.vibrate && !godModeActive) {
-          navigator.vibrate(15); // 짧은 진동
+        setHudVisible(true);
+        // 시작 보호막 — 난이도별 지속시간 (전설은 없음)
+        if (DIFF.shieldMs > 0) {
+          lotusActive = true;
+          lotusTotal = DIFF.shieldMs;
+          lotusEnd = Date.now() + DIFF.shieldMs;
+          sndLotus();
+          showItemText('🌸 시작의 축복! 무적!', 'lotus');
+          document.getElementById('ind-lotus').classList.add('active');
+        } else {
+          showItemText('👑 전설의 여정 — 보호막 없음!', 'poison');
         }
+        flap();
       } else if (gameState === STATE.PLAYING) {
-        bird.vy = JUMP_FORCE;
-        sndJump();
-        spawnPollenEffect(bird.x, bird.y);
-        // [신규] 모바일 진동 피드백 (지원시)
-        if (navigator.vibrate && !godModeActive) {
-          navigator.vibrate(15); // 짧은 진동
-        }
+        flap();
       }
+    }
+    function flap() {
+      bird.vy = DIFF.jump;
+      bird.flapBoost = 1;
+      sndJump();
+      spawnPollenEffect(bird.x - 18, bird.y + 6);
+      if (navigator.vibrate && !godModeActive && hapticsOn) { try { navigator.vibrate(12); } catch (e) { } }
+    }
+    let hapticsOn = store.get('pig_haptics', '1') === '1';
+
+    // UI 요소(버튼·입력·패널·오버레이) 위의 입력은 점프로 처리하지 않음
+    function isUiTarget(t) {
+      if (!t || !t.closest) return false;
+      return !!t.closest('button, input, a, .overlay, .glass-panel, .cyber-panel, .game-manual, #hud, #hud-altitude-wrap, .speed-control');
     }
 
     document.addEventListener('keydown', e => {
-      if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); handleJump(); }
+      if (e.target && e.target.tagName === 'INPUT') return;
+      if (e.code === 'KeyP' || e.code === 'Escape') {
+        if (gameState === STATE.PLAYING) { e.preventDefault(); pauseGame(); }
+        else if (gameState === STATE.PAUSED) { e.preventDefault(); resumeGame(); }
+        return;
+      }
+      if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+        if (gameState === STATE.PAUSED) { e.preventDefault(); resumeGame(); return; }
+        if (gameState === STATE.READY || gameState === STATE.PLAYING) { e.preventDefault(); handleJump(); }
+      }
+      if (e.code === 'Enter' && gameState === STATE.GAMEOVER && _gameOverShown) {
+        e.preventDefault(); document.getElementById('btn-restart').click();
+      }
     });
     document.addEventListener('mousedown', e => {
-      if (
-        e.target.tagName === 'INPUT' ||
-        e.target.tagName === 'BUTTON' ||
-        e.target.classList.contains('btn') ||
-        e.target.closest('.cyber-panel') ||
-        e.target.closest('.glass-panel') ||
-        e.target.closest('#screen-gameover') ||
-        e.target.closest('#screen-menu') ||
-        e.target.closest('#hud') ||
-        e.target.closest('#hud-altitude-wrap')
-      ) return;
+      if (e.button !== 0 || isUiTarget(e.target)) return;
       handleJump();
     });
     document.addEventListener('touchstart', e => {
-      // UI 버튼 / HUD / 입력 영역 / 오버레이 패널은 통과 (click 이벤트 정상 발화 + 스크롤 보장)
-      if (
-        e.target.tagName === 'INPUT' ||
-        e.target.tagName === 'BUTTON' ||
-        e.target.classList.contains('btn') ||
-        e.target.classList.contains('btn-music') ||
-        e.target.classList.contains('btn-manual-toggle') ||
-        e.target.classList.contains('btn-menu-collapse') ||
-        e.target.closest('#hud') ||
-        e.target.closest('#hud-altitude-wrap') ||
-        e.target.closest('.speed-control') ||
-        e.target.closest('#godmode-wrap') ||
-        e.target.closest('#screen-gameover') ||
-        e.target.closest('#screen-menu') ||
-        e.target.closest('.glass-panel') ||
-        e.target.closest('.game-manual')
-      ) return;
-      // 딜레이 없이 즉각 점프 (passive:false + preventDefault로 300ms 딜레이 차단)
+      if (isUiTarget(e.target)) return;
+      // 딜레이 없이 즉각 점프 (passive:false + preventDefault 로 300ms 딜레이·마우스 이벤트 중복 차단)
       e.preventDefault();
       handleJump();
     }, { passive: false });
 
-    // 더블탭 확대 차단 - 단, 버튼/입력 요소/오버레이 패널은 제외하여 click 이벤트 보존
+    // 더블탭 확대 차단 (UI 요소 제외 → click 이벤트 보존)
     document.addEventListener('touchend', e => {
-      if (
-        e.target.tagName === 'INPUT' ||
-        e.target.tagName === 'BUTTON' ||
-        e.target.classList.contains('btn') ||
-        e.target.classList.contains('btn-music') ||
-        e.target.classList.contains('btn-manual-toggle') ||
-        e.target.classList.contains('btn-menu-collapse') ||
-        e.target.closest('#hud') ||
-        e.target.closest('#hud-altitude-wrap') ||
-        e.target.closest('.speed-control') ||
-        e.target.closest('#godmode-wrap') ||
-        e.target.closest('#screen-gameover') ||
-        e.target.closest('#screen-menu') ||
-        e.target.closest('.glass-panel') ||
-        e.target.closest('.game-manual')
-      ) return;
+      if (isUiTarget(e.target)) return;
       e.preventDefault();
     }, { passive: false });
 
-    // iOS·Android 풀다운/바운스 스크롤 차단 (입력 요소 및 오버레이 패널 제외)
+    // iOS·Android 풀다운/바운스 스크롤 차단 (스크롤 가능한 패널 제외)
     document.body.addEventListener('touchmove', e => {
-      const isScrollable = e.target.closest('.cyber-panel') || 
-                           e.target.closest('.glass-panel') || 
-                           e.target.closest('.game-manual') ||
-                           e.target.closest('#screen-gameover') ||
-                           e.target.closest('#screen-menu');
-      if (isScrollable) {
-        // 내부 스크롤을 허용해야 하므로 preventDefault를 건너뜀
-        return;
-      }
+      if (e.target.closest && e.target.closest('.cyber-panel, .glass-panel, .game-manual, .overlay')) return;
       e.preventDefault();
     }, { passive: false });
 
@@ -6620,12 +6856,8 @@ if (totalLuck >= 80) {
     const readyOverlay = document.getElementById('ready-overlay');
     
     // READY 오버레이 직접 클릭/터치 - 즉시 게임 시작
-    readyOverlay.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleJump();
-    });
-    
+    // (데스크톱은 document mousedown 이 처리 — click 까지 받으면 두 번 점프하던 문제 수정)
+
     readyOverlay.addEventListener('touchstart', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -6646,15 +6878,23 @@ if (totalLuck >= 80) {
       document.getElementById('screen-gameover').classList.add('hidden');
       playBGM(); startGame();
     });
-    document.getElementById('btn-menu').addEventListener('click', () => {
+    function goToMenu() {
+      cancelPauseUI();
       document.getElementById('screen-gameover').classList.add('hidden');
-      document.getElementById('hud').classList.add('hidden');
-      document.getElementById('hud-altitude-wrap').classList.add('hidden');
+      setHudVisible(false);
       document.getElementById('item-status').style.opacity = '0';
-      document.getElementById('menu-best').textContent = bestScore;
+      document.getElementById('mult-badge').classList.remove('active');
+      document.getElementById('ready-overlay').classList.add('hidden');
+      renderModePicker();
       document.getElementById('screen-menu').classList.remove('hidden');
       pauseBGM(); gameState = STATE.MENU;
-    });
+    }
+    document.getElementById('btn-menu').addEventListener('click', goToMenu);
+    document.getElementById('btn-pause').addEventListener('click', () => { initAudio(); pauseGame(); });
+    document.getElementById('btn-resume').addEventListener('click', resumeGame);
+    document.getElementById('btn-pause-restart').addEventListener('click', () => { cancelPauseUI(); playBGM(); startGame(level >= 1 && godModeActive ? level : 1); });
+    document.getElementById('btn-pause-menu').addEventListener('click', goToMenu);
+    document.getElementById('btn-quality').addEventListener('click', cycleQuality);
     document.getElementById('btn-music').addEventListener('click', toggleBGMMute);
     document.getElementById('btn-manual-toggle').addEventListener('click', () => {
       const btn = document.getElementById('btn-manual-toggle');
@@ -6741,6 +6981,8 @@ if (totalLuck >= 80) {
         document.getElementById('speed-control').classList.add('hidden');
         // 스테이지 선택 UI 숨김
         hideStageSelector();
+        if (!isUnlocked(currentDiffId)) selectMode('petal');
+        renderModePicker();
         return;
       }
 
@@ -6764,6 +7006,7 @@ if (totalLuck >= 80) {
         document.getElementById('speed-control').classList.remove('hidden');
         // [신규] 스테이지 선택 UI 표시
         showStageSelector();
+        renderModePicker();
       } else {
         input.value = '';
         input.placeholder = '❌ 오답';
@@ -6823,16 +7066,7 @@ if (totalLuck >= 80) {
     }
 
     // [신규] HUD 메뉴 버튼 이벤트 - 무적 모드용
-    document.getElementById('btn-hud-menu').addEventListener('click', () => {
-      pauseBGM();
-      document.getElementById('hud').classList.add('hidden');
-      document.getElementById('hud-altitude-wrap').classList.add('hidden');
-      document.getElementById('item-status').style.opacity = '0';
-      document.getElementById('mult-badge').classList.remove('active');
-      document.getElementById('menu-best').textContent = bestScore + '%';
-      document.getElementById('screen-menu').classList.remove('hidden');
-      gameState = STATE.MENU;
-    });
+    document.getElementById('btn-hud-menu').addEventListener('click', goToMenu);
 
     // [신규] 무적 모드 해제 버튼 이벤트
     document.getElementById('btn-godmode-off').addEventListener('click', () => {
@@ -6844,6 +7078,8 @@ if (totalLuck >= 80) {
       document.getElementById('btn-godmode-off').classList.add('hidden');
       document.getElementById('speed-control').classList.add('hidden');
       hideStageSelector();
+      if (!isUnlocked(currentDiffId)) selectMode('petal');
+      renderModePicker();
       spawnTextParticle('👼 무적 모드 비활성화', BASE_W * 0.5, BASE_H * 0.4, '#ff6b6b', 22);
     });
 
@@ -7047,10 +7283,10 @@ if (totalLuck >= 80) {
     /* ================================================================
        INIT
        ================================================================ */
-    document.getElementById('menu-best').textContent = bestScore + '%';
-    // [수정] 페이지 로드 시 HUD 명시적으로 숨김 (메인 메뉴에서 보이지 않도록)
-    document.getElementById('hud').classList.add('hidden');
-    document.getElementById('hud-altitude-wrap').classList.add('hidden');
+    // 페이지 로드 시 HUD 숨김 + 난이도/화질/아바타 초기화
+    setHudVisible(false);
+    selectMode(isUnlocked(currentDiffId) ? currentDiffId : 'petal');
+    updateQualityBtn();
     initBird(); initStars(); initLightParticles(); initGroundDecorations();
     requestAnimationFrame(gameLoop);
   </script>
