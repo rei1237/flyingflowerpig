@@ -3,21 +3,21 @@
  * 캐싱 및 오프라인 지원
  */
 
-const CACHE_NAME = 'flying-flower-pig-v1';
+const CACHE_NAME = 'flying-flower-pig-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/pig-main.png',
-  '/pig-wink.png',
-  '/pig-crash.png',
-  '/pig-falling.png',
-  '/sky-day-ko.jpg',
-  '/sky-sunset-ko.jpg',
-  '/sky-night-ko.jpg',
-  '/sky-space-ko.jpg',
-  '/title-logo.webp',
-  '/freepik-growth-groove.mp3'
+  '/pig-main.webp',
+  '/pig-wink.webp',
+  '/pig-crash.webp',
+  '/pig-falling.webp',
+  '/sky-day.webp',
+  '/sky-sunset.webp',
+  '/sky-night.webp',
+  '/sky-space.webp',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 // ── 설치: 정적 자산 캐싱 ──
@@ -73,6 +73,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // HTML(페이지 이동)은 네트워크 우선 → 새 버전이 바로 반영, 오프라인이면 캐시
+  if (request.mode === 'navigate' || url.pathname.endsWith('.html')) {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          if (res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(request).then((r) => r || caches.match('/index.html')))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request)
       .then((cachedResponse) => {
@@ -124,8 +140,8 @@ self.addEventListener('push', (event) => {
     const data = event.data.json();
     const options = {
       body: data.body || '🐷 연이가 기다리고 있어요!',
-      icon: '/pig-main.png',
-      badge: '/pig-main.png',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       tag: data.tag || 'flower-pig',
       requireInteraction: false,
       vibrate: [200, 100, 200]
