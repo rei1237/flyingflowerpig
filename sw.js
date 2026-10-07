@@ -3,7 +3,8 @@
  * 캐싱 및 오프라인 지원
  */
 
-const CACHE_NAME = 'flying-flower-pig-v3';
+const CACHE_NAME = 'flying-flower-pig-v4';
+// 스테이지 배경은 처음 쓰일 때 런타임 캐시에 저장 (첫 설치 데이터 절약)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -13,9 +14,6 @@ const STATIC_ASSETS = [
   '/pig-crash.webp',
   '/pig-falling.webp',
   '/sky-day.webp',
-  '/sky-sunset.webp',
-  '/sky-night.webp',
-  '/sky-space.webp',
   '/icon-192.png',
   '/icon-512.png'
 ];

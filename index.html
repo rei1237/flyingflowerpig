@@ -3515,6 +3515,31 @@
     }
     #screen-gameover .cyber-stats-container { grid-template-columns: repeat(3, 1fr); gap: 10px; }
 
+    .stage-map-wrap { width: 100%; margin: 0 0 12px; text-align: left; }
+    .stage-map {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px;
+    }
+    .sm-dot {
+      aspect-ratio: 1; display: grid; place-items: center;
+      border-radius: 8px; font-size: 13px;
+      background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.35);
+    }
+    .sm-dot.open { background: rgba(255, 157, 176, 0.16); }
+    .sm-dot.current { box-shadow: 0 0 0 1.5px #ff9db0; }
+
+    /* [성능] 그림자·블러·배경위치를 매 프레임 다시 칠하던 무한 애니메이션 → transform/opacity 만 사용 */
+    @keyframes neonPulse { 0% { opacity: 0.55; } 100% { opacity: 1; } }
+    @keyframes relicPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    @keyframes badgeGlow { 0% { opacity: 0.88; } 100% { opacity: 1; } }
+    @keyframes btnGlow { 0% { opacity: 0.92; } 100% { opacity: 1; } }
+    @keyframes fortunePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+    @keyframes godmodePulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+    @keyframes storyGlow { 0% { opacity: 0.9; } 100% { opacity: 1; } }
+    @keyframes pulseDream { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.08); opacity: 1; } }
+    @keyframes goldShimmer { 0%, 100% { opacity: 1; } }
+    @keyframes pinkShimmer { 0%, 100% { opacity: 1; } }
+
     @media (max-width: 360px) {
       .mode-name { font-size: 11px; }
       .mode-opt { min-height: 58px; }
@@ -3652,6 +3677,12 @@
             <div class="mode-detail" id="mode-detail" aria-live="polite"></div>
           </div>
 
+          <!-- ── 스테이지 지도 ── -->
+          <div class="stage-map-wrap">
+            <div class="mode-section-label"><span>여정 지도</span><small id="stage-map-label">1/11</small></div>
+            <ol class="stage-map" id="stage-map" aria-label="도달한 스테이지"></ol>
+          </div>
+
           <!-- ── PRIMARY CTA ── -->
           <button class="btn btn-primary btn-start-cta" id="btn-start">
             <span class="btn-start-icon">
@@ -3713,7 +3744,7 @@
               <div class="manual-item"><strong>🍼 아기돼지</strong> → <strong>🌱 새싹</strong> → <strong>🌸 꽃잎</strong> → <strong>🔥 열정</strong> → <strong>👑 전설</strong> → <strong>🌌 신화</strong></div>
               <div class="manual-item">해금: 열정(꽃잎 60점) · 전설(열정 135점) · 신화(전설 180점)</div>
               <div class="manual-item">등급 D 씨앗 ~ SSS 우주 꽃돼지 ~ ∞ 무한 (어려운 모드일수록 가산)</div>
-              <div class="manual-item">스테이지 10단계: 🌸꽃밭 🍃바람 언덕 ☁️노을 구름 🏜️황혼 사막 🌙별빛 밤 🌌오로라 🚀우주 🪐은하 정원 🌑블랙홀 ♾️무한</div>
+              <div class="manual-item">스테이지 11단계: 🌸꽃밭 🍃바람 언덕 🌅노을 언덕 ☁️노을 구름 🌕달빛 정원 🌌오로라 밤 🔭하늘 천문대 🚀우주 🪐은하 정원 🌑일식의 하늘 ♾️무한</div>
             </div>
             <div class="manual-section manual-cheer">
               <div class="manual-cheer-text">연이의 꿈을 응원해주세요! 💕</div>
@@ -3943,34 +3974,37 @@
        · ground/pipe: 지면·기둥 테마 · decor: 지면 장식 · stars: 별 밝기(0=없음)
        ================================================================ */
     const STAGES = [
-      { at: 0, name: '꽃밭', emoji: '🌸', speed: 1.00, gap: 220, interval: 1800, move: 0.00, bg: 1, ground: 1, pipe: 1, decor: 'meadow', stars: 0,
+      { at: 0, name: '꽃밭', emoji: '🌸', speed: 1.00, gap: 220, interval: 1800, move: 0.00, bg: 'day', ground: 1, pipe: 1, decor: 'meadow', stars: 0,
         light: 'rgba(255,240,200,', burst: ['#a8ff60', '#70ff40', '#ffffff', '#ffd700', '#c8ff80'], butterflies: true,
         story: ['꽃밭에서 날아오르는 꿈을 꾸며...', '작은 돼지 연이의 대모험이 시작됩니다!', '꽃잎을 타고 바람을 가르며 하늘로~'] },
-      { at: 30, name: '바람 언덕', emoji: '🍃', speed: 1.05, gap: 208, interval: 1650, move: 0.12, bg: 1, overlay: 'rgba(255,214,120,0.10)', ground: 5, pipe: 5, decor: 'meadow', stars: 0,
+      { at: 30, name: '바람 언덕', emoji: '🍃', speed: 1.05, gap: 208, interval: 1650, move: 0.12, bg: 'day', overlay: 'rgba(255,214,120,0.10)', ground: 5, pipe: 5, decor: 'meadow', stars: 0,
         light: 'rgba(255,250,210,', burst: ['#d4ff7a', '#ffe680', '#ffffff', '#9be15d', '#fff3b0'], butterflies: true,
         story: ['살랑이는 바람을 타고 언덕을 넘어요', '민들레 씨앗과 함께 둥실둥실~', '바람이 연이의 날개를 밀어줘요!'] },
-      { at: 60, name: '노을 구름', emoji: '☁️', speed: 1.10, gap: 198, interval: 1500, move: 0.25, bg: 2, ground: 2, pipe: 2, decor: 'cacti', stars: 0,
+      { at: 60, name: '노을 언덕', emoji: '🌅', speed: 1.09, gap: 200, interval: 1540, move: 0.2, bg: 'hill', ground: 5, pipe: 6, decor: 'meadow', stars: 0,
+        light: 'rgba(255,200,140,', burst: ['#ffb347', '#ffcc80', '#ffffff', '#ff8a65', '#ffe0b2'],
+        story: ['바다 너머로 해가 지는 언덕이에요', '소나무 아래 벤치에서 잠깐 쉬어갈까?', '노을빛이 연이의 날개를 물들여요'] },
+      { at: 95, name: '노을 구름', emoji: '☁️', speed: 1.13, gap: 193, interval: 1430, move: 0.28, bg: 'sunset', ground: 2, pipe: 2, decor: 'cacti', stars: 0,
         light: 'rgba(255,190,120,', burst: ['#ffb060', '#ff8040', '#ffd080', '#ffffff', '#ff6030'],
         story: ['솜사탕 같은 구름 위를 달려요!', '연이는 무지개를 찾아 더 높이 날아갑니다', '구름 사이로 보이는 작은 세상이 신기해요'] },
-      { at: 95, name: '황혼 사막', emoji: '🏜️', speed: 1.16, gap: 190, interval: 1380, move: 0.32, bg: 2, overlay: 'rgba(160,60,140,0.20)', ground: 6, pipe: 6, decor: 'cacti', stars: 0.25,
-        light: 'rgba(255,170,200,', burst: ['#ff9a8b', '#ff6a88', '#ffd1a4', '#ffffff', '#c86bfa'],
-        story: ['해가 지는 사막 위로 별이 하나 둘...', '보랏빛 하늘 아래 연이는 용기를 내요', '모래바람을 뚫고 더 높이!'] },
-      { at: 135, name: '별빛 밤', emoji: '🌙', speed: 1.22, gap: 180, interval: 1240, move: 0.40, bg: 3, ground: 3, pipe: 3, decor: 'lamps', stars: 0.5,
-        light: 'rgba(180,210,255,', burst: ['#9090ff', '#c0a0ff', '#ffffff', '#8060ff', '#e0d0ff'],
-        story: ['별빛이 쏟아지는 밤하늘에 도착!', '연이는 밤하늘의 별들과 인사를 나눕니다', '가로등 불빛이 연이를 응원해요'] },
-      { at: 180, name: '오로라 성층권', emoji: '🌌', speed: 1.30, gap: 172, interval: 1120, move: 0.50, bg: 3, overlay: 'aurora', ground: 7, pipe: 7, decor: 'lamps', stars: 0.7,
+      { at: 135, name: '달빛 정원', emoji: '🌕', speed: 1.18, gap: 186, interval: 1320, move: 0.35, bg: 'moon', ground: 11, pipe: 11, decor: 'meadow', stars: 0.3,
+        light: 'rgba(255,225,170,', burst: ['#ffd27f', '#ffb6c1', '#ffffff', '#f48fb1', '#fff1c1'],
+        story: ['보름달이 비추는 꽃 정원에 도착!', '달님에게 소원을 빌어볼까요?', '벚꽃잎이 달빛에 반짝여요'] },
+      { at: 180, name: '오로라 밤', emoji: '🌌', speed: 1.24, gap: 179, interval: 1210, move: 0.42, bg: 'night', overlay: 'aurora', ground: 7, pipe: 7, decor: 'lamps', stars: 0.6,
         light: 'rgba(160,255,220,', burst: ['#7fffd4', '#40e0d0', '#ffffff', '#b0ffb0', '#80d0ff'],
-        story: ['초록빛 오로라가 춤추는 성층권!', '높이 날수록 공기는 얇아지지만 용기는 커져요', '오로라 커튼 사이를 미끄러지듯~'] },
-      { at: 235, name: '우주', emoji: '🚀', speed: 1.40, gap: 163, interval: 980, move: 0.62, bg: 4, ground: 4, pipe: 4, decor: 'meteors', stars: 0.95, nebula: true,
+        story: ['초록빛 오로라가 춤추는 밤하늘!', '가로등 불빛이 연이를 응원해요', '오로라 커튼 사이를 미끄러지듯~'] },
+      { at: 230, name: '하늘 천문대', emoji: '🔭', speed: 1.31, gap: 172, interval: 1100, move: 0.5, bg: 'observatory', ground: 12, pipe: 12, decor: 'lamps', stars: 0.5,
+        light: 'rgba(255,230,160,', burst: ['#ffd36b', '#7a98e0', '#ffffff', '#c0d0f8', '#ffe9a8'],
+        story: ['구름 위에 떠 있는 황금 천문대!', '망원경으로 다음 목적지를 찾아봐요', '별자리 바퀴가 길을 알려줘요'] },
+      { at: 290, name: '우주', emoji: '🚀', speed: 1.40, gap: 164, interval: 980, move: 0.6, bg: 'space', ground: 4, pipe: 4, decor: 'meteors', stars: 0.95, nebula: true,
         light: 'rgba(230,200,255,', burst: ['#d080ff', '#ff80ff', '#ffffff', '#a040ff', '#ff40ff'],
         story: ['우주의 경계를 넘어서는 순간...', '연이는 지구를 바라보며 깜짝 놀라요!', '반짝이는 별들 사이로 자유롭게 여행합니다'] },
-      { at: 300, name: '은하 정원', emoji: '🪐', speed: 1.50, gap: 157, interval: 870, move: 0.70, bg: 4, overlay: 'rgba(255,80,200,0.12)', ground: 8, pipe: 8, decor: 'meteors', stars: 1, nebula: true,
+      { at: 360, name: '은하 정원', emoji: '🪐', speed: 1.49, gap: 157, interval: 870, move: 0.68, bg: 'galaxy', ground: 8, pipe: 8, decor: 'meteors', stars: 0.6,
         light: 'rgba(255,190,240,', burst: ['#ff9de2', '#ffd6f5', '#ffffff', '#c084fc', '#7dd3fc'],
-        story: ['은하수에 피어난 별꽃 정원이에요', '행성 고리를 미끄럼틀처럼 타고~', '우주에도 꽃이 핀다는 걸 연이가 증명했어요!'] },
-      { at: 380, name: '블랙홀', emoji: '🌑', speed: 1.58, gap: 151, interval: 770, move: 0.76, bg: 4, overlay: 'blackhole', ground: 9, pipe: 9, decor: 'meteors', stars: 0.8, nebula: true,
-        light: 'rgba(255,140,140,', burst: ['#ff5f6d', '#ffc371', '#ffffff', '#b31217', '#ff9a9e'],
-        story: ['모든 것을 삼키는 블랙홀 앞에 섰어요', '빛마저 휘어지는 곳, 연이의 날개는 굳건해요', '중력을 이겨내고 반대편으로!'] },
-      { at: 480, name: '무한', emoji: '♾️', speed: 1.66, gap: 146, interval: 660, move: 0.80, bg: 4, overlay: 'rainbow', ground: 10, pipe: 10, decor: 'meteors', stars: 1, nebula: true,
+        story: ['은하수에 피어난 별꽃 정원이에요', '빛의 물길을 따라 날아가요~', '우주에도 꽃이 핀다는 걸 연이가 증명했어요!'] },
+      { at: 440, name: '일식의 하늘', emoji: '🌑', speed: 1.57, gap: 151, interval: 770, move: 0.75, bg: 'eclipse', ground: 9, pipe: 9, decor: 'meteors', stars: 0.4,
+        light: 'rgba(255,200,150,', burst: ['#ff5f6d', '#ffc371', '#ffffff', '#b31217', '#ff9a9e'],
+        story: ['검은 태양이 떠오른 신비한 하늘', '빛이 사라진 곳에서도 연이는 빛나요', '일식의 고리를 통과해 반대편으로!'] },
+      { at: 540, name: '무한', emoji: '♾️', speed: 1.66, gap: 146, interval: 660, move: 0.8, bg: 'space', overlay: 'rainbow', ground: 10, pipe: 10, decor: 'meteors', stars: 1, nebula: true,
         light: 'rgba(255,255,255,', burst: ['#ffffff', '#d0d0ff', '#ff80ff', '#80ffff', '#ffd700'],
         story: ['무한한 우주 속으로 더 멀리...', '연이는 전설의 우주 돼지가 되어가고 있어요!', '어디까지든 날아갈 수 있을 것만 같아요!'] }
     ];
@@ -3978,6 +4012,8 @@
     const LVL_THRESHOLDS = STAGES.map(s => s.at);
     function stageOf(lv) { return STAGES[Math.max(1, Math.min(lv, MAX_STAGE)) - 1]; }
     function curStage() { return stageOf(level); }
+    // 현재·다음 스테이지 배경 미리 받기
+    function prefetchStageBg(lv) { loadBg(stageOf(lv).bg); if (lv < MAX_STAGE) loadBg(stageOf(lv + 1).bg); }
 
     /* ================================================================
        [신규] 난이도 모드 체계 — 새싹 / 꽃잎 / 열정 / 전설
@@ -4000,13 +4036,13 @@
       },
       petal: {
         id: 'petal', name: '꽃잎', emoji: '🌸', tag: 'NORMAL', color: '#ff9db0',
-        desc: '기본 여정. 7단계 우주부터 어둠의 오오라가 나타나요.',
+        desc: '기본 여정. 8단계 우주부터 어둠의 오오라가 나타나요.',
         gravity: 0.40, jump: -8.0, maxFall: 10, gapScale: 1, speedScale: 1, intervalScale: 1,
-        moveScale: 1, auraFrom: 7, itemRate: 0.32, lotusBonus: 1, shieldMs: 5000, hitPad: 0.25, rankWeight: 1.0
+        moveScale: 1, auraFrom: 8, itemRate: 0.32, lotusBonus: 1, shieldMs: 5000, hitPad: 0.25, rankWeight: 1.0
       },
       blaze: {
         id: 'blaze', name: '열정', emoji: '🔥', tag: 'HARD', color: '#ffb067',
-        desc: '빠르고 좁은 틈. 5단계 별빛 밤부터 오오라가 몰려와요.',
+        desc: '빠르고 좁은 틈. 5단계 달빛 정원부터 오오라가 몰려와요.',
         gravity: 0.44, jump: -8.4, maxFall: 11, gapScale: 0.9, speedScale: 1.12, intervalScale: 0.93,
         moveScale: 1.3, auraFrom: 5, itemRate: 0.26, lotusBonus: 0.6, shieldMs: 2500, hitPad: 0.22, rankWeight: 1.4
       },
@@ -4058,6 +4094,11 @@
       return o;
     })();
     function saveModeBests() { store.set('pig_best_modes', JSON.stringify(modeBests)); }
+    // 지금까지 도달한 가장 높은 스테이지 (메뉴의 스테이지 지도에 표시)
+    let maxStageReached = Math.max(1, parseInt(store.get('pig_max_stage', '1'), 10) || 1);
+    function stageReached(lv) {
+      if (lv > maxStageReached) { maxStageReached = lv; store.set('pig_max_stage', lv); }
+    }
 
     let currentDiffId = DIFFICULTIES[store.get('pig_difficulty', 'petal')] ? store.get('pig_difficulty', 'petal') : 'petal';
     let DIFF = DIFFICULTIES[currentDiffId];
@@ -4076,11 +4117,22 @@
 
     // ── 에셋 로드 (상대 경로 - GitHub Pages 호환) ──
     // [개선] 돼지 PNG 스프라이트(약 760KB) 대신 캐릭터 시트 기반 벡터 렌더러(Yeoni) 사용
-    const bgImages = { 1: new Image(), 2: new Image(), 3: new Image(), 4: new Image() };
-    bgImages[1].src = './sky-day.webp';
-    bgImages[2].src = './sky-sunset.webp';
-    bgImages[3].src = './sky-night.webp';
-    bgImages[4].src = './sky-space.webp';
+    // [성능] 배경은 필요한 스테이지(현재 + 다음)만 그때그때 내려받음 → 첫 로딩은 꽃밭 하늘 1장
+    const BG_FILES = {
+      day: './sky-day.webp', sunset: './sky-sunset.webp', night: './sky-night.webp', space: './sky-space.webp',
+      hill: './bg-seaside-hill.webp', moon: './bg-moon-garden.webp', observatory: './bg-observatory.webp',
+      galaxy: './bg-galaxy-garden.webp', eclipse: './bg-eclipse.webp'
+    };
+    const bgImages = {};
+    function loadBg(key) {
+      if (!key || bgImages[key]) return bgImages[key];
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = BG_FILES[key];
+      if (img.decode) img.decode().catch(() => { });
+      return (bgImages[key] = img);
+    }
+    loadBg('day');
     const BGM_URL = './freepik-growth-groove.mp3';
 
     const CRASH_DURATION = 2000;
@@ -5351,7 +5403,10 @@
        ================================================================ */
     let bgFade = { from: 0, start: 0 };   // from: 이전 스테이지 번호
     const BG_FADE_MS = 1400;
-    const BG_FALLBACK = { 1: ['#b0e0ff', '#e8f4fd'], 2: ['#ff8c42', '#ffe4b5'], 3: ['#0d0d2e', '#1a1a4a'], 4: ['#03030f', '#060615'] };
+    const BG_FALLBACK = {
+      day: ['#b0e0ff', '#e8f4fd'], sunset: ['#ff8c42', '#ffe4b5'], night: ['#0d0d2e', '#1a1a4a'], space: ['#03030f', '#060615'],
+      hill: ['#4a4e8a', '#f0a060'], moon: ['#3a0a18', '#6a1a30'], observatory: ['#0c1a4a', '#24305e'], galaxy: ['#120a2a', '#3a2050'], eclipse: ['#0a0a18', '#2a2a40']
+    };
     function bgLevelOf(lv) { return lv; }
     // 오로라 커튼 (한 번만 그려 캐시)
     let _auroraSprite = null;
@@ -5374,7 +5429,7 @@
     // [성능] 배경 사진 + 고정 색조를 화면 픽셀 해상도로 미리 합성 → 매 프레임 1:1 복사 (리샘플링 없음)
     const _bgCache = new Map();
     function bgCanvas(st) {
-      const img = bgImages[st.bg];
+      const img = loadBg(st.bg);
       if (!img || !img.complete || !img.naturalWidth) return null;
       const tint = st.overlay && st.overlay.startsWith('rgba') ? st.overlay : '';
       const key = `${st.bg}|${tint}|${_renderCacheGen}|${BASE_H}|${canvas.width}`;
@@ -5396,7 +5451,7 @@
     }
     function drawStageBg(lv, alpha) {
       const st = stageOf(lv);
-      const img = bgImages[st.bg];
+      const img = loadBg(st.bg);
       ctx.globalAlpha = alpha;
       const cached = bgCanvas(st);
       if (cached) {
@@ -5408,7 +5463,7 @@
         else { dw = BASE_W; dh = dw / ir; dx = 0; dy = (BASE_H - dh) / 2; }
         ctx.drawImage(img, dx, dy, dw, dh);
       } else {
-        const [c1, c2] = BG_FALLBACK[st.bg] || BG_FALLBACK[1];
+        const [c1, c2] = BG_FALLBACK[st.bg] || BG_FALLBACK.day;
         const g = ctx.createLinearGradient(0, 0, 0, BASE_H);
         g.addColorStop(0, c1); g.addColorStop(1, c2);
         ctx.fillStyle = g; ctx.fillRect(0, 0, BASE_W, BASE_H);
@@ -5459,7 +5514,9 @@
       7: { topSurface: '#5fd3b5', topEdge: '#2f9c86', soil: '#2c3d5a', patternDark: '#1e2a44', patternLight: '#3a4e70' },
       8: { topSurface: '#d58cf0', topEdge: '#9a52b8', soil: '#3a2550', patternDark: '#2a1840', patternLight: '#4a3264' },
       9: { topSurface: '#6a3a4c', topEdge: '#3a2030', soil: '#24141c', patternDark: '#160a10', patternLight: '#301c26' },
-      10: { topSurface: '#e0e6ff', topEdge: '#a8b0d8', soil: '#4a4f7a', patternDark: '#383c62', patternLight: '#5c6290' }
+      10: { topSurface: '#e0e6ff', topEdge: '#a8b0d8', soil: '#4a4f7a', patternDark: '#383c62', patternLight: '#5c6290' },
+      11: { topSurface: '#c86a8a', topEdge: '#8e4062', soil: '#4a2030', patternDark: '#381624', patternLight: '#5a2a3c' },
+      12: { topSurface: '#e2c46a', topEdge: '#a8862e', soil: '#22305a', patternDark: '#18234a', patternLight: '#2e3e70' }
     };
     const GROUND_PERIOD = 260;
     let _groundStrip = null, _groundKey = '';
@@ -5729,9 +5786,9 @@
       const gapY = rand(110, BASE_H - GROUND_H - gap - 100);
 
       // [수정] 검은 오오라는 우주(레벨 4)부터만 등장
-      // [난이도] 모드별 오오라 등장 스테이지 (꽃잎=7 우주, 열정=5 별빛 밤, 전설=3, 신화=2)
+      // [난이도] 모드별 오오라 등장 스테이지 (꽃잎=8 우주, 열정=5 달빛 정원, 전설=3, 신화=2)
       let auraRate = 0;
-      if (level >= DIFF.auraFrom) auraRate = level >= 7 ? 0.45 : 0.3;
+      if (level >= DIFF.auraFrom) auraRate = level >= 8 ? 0.45 : 0.3;
 
       const isAura = Math.random() < auraRate;
       const obstacleType = isAura ? (Math.random() < 0.5 ? 1 : 2) : 0;
@@ -5774,7 +5831,9 @@
       7: { base: '#38b8c8', hi: '#86e2ec', hiStrong: '#c8f4f8', shadow: '#1a6a78' },
       8: { base: '#c070d8', hi: '#e2a8f0', hiStrong: '#f4d8fa', shadow: '#6c3484' },
       9: { base: '#7a2a3a', hi: '#b05060', hiStrong: '#d08a96', shadow: '#3c1018' },
-      10: { base: '#e8d58a', hi: '#fff0b8', hiStrong: '#fffbe6', shadow: '#9a8434' }
+      10: { base: '#e8d58a', hi: '#fff0b8', hiStrong: '#fffbe6', shadow: '#9a8434' },
+      11: { base: '#b04a6a', hi: '#e08aa4', hiStrong: '#f8c8d6', shadow: '#5c1e34' },
+      12: { base: '#3a5aa8', hi: '#7a98e0', hiStrong: '#c0d0f8', shadow: '#1c2c60' }
     };
     const PIPE_CAP_H = 24, PIPE_CAP_W = PIPE_W + 10, PIPE_PAD = 2;
     let _pipeSprites = null, _pipeKey = '';
@@ -5884,6 +5943,8 @@
           if (nl > level) {
             bgFade = { from: bgLevelOf(level), start: performance.now() };
             prevLevel = level; level = nl;
+            prefetchStageBg(level);
+            stageReached(level);
             _hudProgressLast = -1;
             initStars();
             spawnLevelUpEffect(level);
@@ -5998,7 +6059,7 @@
     // [수정] 레벨별 가중치 - 우주(4+)에서는 황금연꽃이 더 자주 등장
     function getItemWeights() {
       // 황금연꽃은 드물게 — 높은 스테이지일수록 조금 더 자주
-      if (level >= 7) return [1, 4, 4, 5];
+      if (level >= 8) return [1, 4, 4, 5];
       if (level >= 5) return [0.5, 4, 4, 5];
       return [0.2, 4, 5, 6];
     }
@@ -6379,7 +6440,7 @@
       setTimeout(() => {
         // 기본 정보 설정
         document.getElementById('go-altitude').textContent = `${Math.floor(altitude)}m`;
-        document.getElementById('go-level').textContent = level;
+        document.getElementById('go-level').textContent = `${curStage().emoji} ${level}`;
 
         const storyText = getStageStory(level, obstacleType);
         const fortune = getFortune(score);
@@ -6571,6 +6632,7 @@ if (totalLuck >= 80) {
       $('menu-best').textContent = best + '%';
       const lbl = $('menu-best-mode');
       if (lbl) lbl.textContent = `${d.emoji} ${d.name}`;
+      renderStageMap();
       const sub = $('btn-start-sub');
       if (sub) sub.textContent = `${d.emoji} ${d.name} 모드`;
     }
@@ -6582,6 +6644,19 @@ if (totalLuck >= 80) {
       bestScore = modeBests[id] || 0;
       if (fromUser) { initAudio(); beep(660, 'sine', 0.06, 0.12); }
       renderModePicker();
+    }
+
+    // ── 메뉴: 스테이지 지도 (도달한 곳까지 색칠) ──
+    function renderStageMap() {
+      const el = $('stage-map');
+      if (!el) return;
+      el.innerHTML = STAGES.map((st, i) => {
+        const n = i + 1, open = n <= maxStageReached;
+        return `<li class="sm-dot${open ? ' open' : ''}${n === maxStageReached ? ' current' : ''}" title="${n}. ${open ? st.name : '???'}">` +
+          `<span aria-hidden="true">${open ? st.emoji : '·'}</span></li>`;
+      }).join('');
+      const cur = stageOf(maxStageReached);
+      $('stage-map-label').textContent = `${maxStageReached}/${MAX_STAGE} ${cur.emoji} ${cur.name}`;
     }
 
     // ── 화질 설정 (자동 → 고화질 → 절전) ──
@@ -6624,7 +6699,7 @@ if (totalLuck >= 80) {
        START GAME
        ================================================================ */
     function startGame(startingLevel = 1) {
-      score = 0; level = startingLevel; frameCount = 0; lastPipeTime = 0;
+      score = 0; level = startingLevel; prefetchStageBg(startingLevel); frameCount = 0; lastPipeTime = 0;
       altitude = 0;
       altitudeSpeed = 8.0 + startingLevel * 2.0; // [수정] 시작 레벨에 맞는 속도 설정
       scoreMultiplier = 1;
