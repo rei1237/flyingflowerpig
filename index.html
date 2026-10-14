@@ -29,7 +29,7 @@
   <link rel="preload" as="image" href="./sky-day.webp" type="image/webp" />
   <link rel="preload" as="image" href="./pig-main.webp" type="image/webp" />
   <link
-    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Nanum+Pen+Script&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Gowun+Batang:wght@700&family=Nanum+Pen+Script&display=swap"
     rel="stylesheet" />
   <style>
     *,
@@ -3348,7 +3348,7 @@
       outline: 2px solid #ffd6e0; outline-offset: 2px;
     }
     #game-wrap #item-status { top: calc(var(--safe-top) + 132px); left: 12px; }
-    #game-wrap .story-overlay { top: calc(var(--safe-top) + 150px); }
+    #game-wrap .story-overlay { top: calc(var(--safe-top) + 196px); }
     .menu-util-btn { min-width: 0; white-space: nowrap; }
     .menu-util-btn.btn-music::before { content: none !important; }
     .menu-util-btn .util-label { overflow: hidden; text-overflow: ellipsis; }
@@ -3540,6 +3540,49 @@
     @keyframes goldShimmer { 0%, 100% { opacity: 1; } }
     @keyframes pinkShimmer { 0%, 100% { opacity: 1; } }
 
+    /* ── 스테이지 카드: 키커(스테이지 번호) + 세리프 제목 + 한 줄 문구, 스테이지별 포인트 색 ── */
+    #game-wrap .story-overlay {
+      --accent: #ffd6e0;
+      width: min(320px, 86%); max-width: none;
+      animation: none;
+    }
+    .stage-card {
+      position: relative;
+      padding: 18px 22px 16px;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(18, 10, 28, 0.78), rgba(18, 10, 28, 0.62));
+      border-top: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+      border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    }
+    .stage-kicker {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      font-family: var(--font-game); font-weight: 500; font-size: 10px;
+      letter-spacing: 0.32em;
+      color: var(--accent);
+    }
+    .stage-rule { flex: 0 0 28px; height: 1px; background: currentColor; opacity: 0.6; }
+    .stage-title {
+      margin-top: 8px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-family: 'Gowun Batang', 'Noto Serif KR', serif;
+      font-weight: 700; font-size: 30px; line-height: 1.15;
+      letter-spacing: 0.02em;
+      color: #fffaf2;
+      text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25), 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent);
+      text-wrap: balance;
+    }
+    .stage-icon { font-size: 22px; filter: none; }
+    .stage-line {
+      margin-top: 8px;
+      font-family: var(--font-ui); font-weight: 500; font-size: 13px; line-height: 1.55;
+      color: rgba(255, 248, 240, 0.86);
+      text-wrap: pretty;
+    }
+    #game-wrap .story-overlay .story-text, #game-wrap .story-overlay .story-emoji { all: unset; }
+    #game-wrap .hud-level { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, #fff) 45%, transparent); }
+    #hud-progress-bar { background: linear-gradient(90deg, color-mix(in srgb, var(--accent, #ffd6e0) 55%, #fff), var(--accent, #ff9db0)); }
+
     @media (max-width: 360px) {
       .mode-name { font-size: 11px; }
       .mode-opt { min-height: 58px; }
@@ -3560,9 +3603,12 @@
     <div id="fade-overlay"></div>
 
     <!-- [신규] 연이의 여행 스토리 오버레이 -->
-    <div class="story-overlay hidden" id="story-overlay">
-      <span class="story-emoji" id="story-emoji">🌸</span>
-      <div class="story-text" id="story-text">연이의 여행이 시작됩니다!</div>
+    <div class="story-overlay hidden" id="story-overlay" aria-live="polite">
+      <div class="stage-card">
+        <div class="stage-kicker"><span class="stage-rule"></span><span id="story-kicker">STAGE 01</span><span class="stage-rule"></span></div>
+        <div class="stage-title"><span class="stage-icon" id="story-icon" aria-hidden="true">🌸</span><span id="story-emoji">꽃밭</span></div>
+        <div class="stage-line" id="story-text">연이의 여행이 시작됩니다!</div>
+      </div>
     </div>
 
     <!-- [신규] READY 오버레이 -->
@@ -3974,37 +4020,37 @@
        · ground/pipe: 지면·기둥 테마 · decor: 지면 장식 · stars: 별 밝기(0=없음)
        ================================================================ */
     const STAGES = [
-      { at: 0, name: '꽃밭', emoji: '🌸', speed: 1.00, gap: 220, interval: 1800, move: 0.00, bg: 'day', ground: 1, pipe: 1, decor: 'meadow', stars: 0,
+      { at: 0, name: '꽃밭', accent: '#ffd6e0', emoji: '🌸', speed: 1.00, gap: 220, interval: 1800, move: 0.00, bg: 'day', ground: 1, pipe: 1, decor: 'meadow', stars: 0,
         light: 'rgba(255,240,200,', burst: ['#a8ff60', '#70ff40', '#ffffff', '#ffd700', '#c8ff80'], butterflies: true,
         story: ['꽃밭에서 날아오르는 꿈을 꾸며...', '작은 돼지 연이의 대모험이 시작됩니다!', '꽃잎을 타고 바람을 가르며 하늘로~'] },
-      { at: 30, name: '바람 언덕', emoji: '🍃', speed: 1.05, gap: 208, interval: 1650, move: 0.12, bg: 'day', overlay: 'rgba(255,214,120,0.10)', ground: 5, pipe: 5, decor: 'meadow', stars: 0,
+      { at: 30, name: '바람 언덕', accent: '#e4f2c4', emoji: '🍃', speed: 1.05, gap: 208, interval: 1650, move: 0.12, bg: 'day', overlay: 'rgba(255,214,120,0.10)', ground: 5, pipe: 5, decor: 'meadow', stars: 0,
         light: 'rgba(255,250,210,', burst: ['#d4ff7a', '#ffe680', '#ffffff', '#9be15d', '#fff3b0'], butterflies: true,
         story: ['살랑이는 바람을 타고 언덕을 넘어요', '민들레 씨앗과 함께 둥실둥실~', '바람이 연이의 날개를 밀어줘요!'] },
-      { at: 60, name: '노을 언덕', emoji: '🌅', speed: 1.09, gap: 200, interval: 1540, move: 0.2, bg: 'hill', ground: 5, pipe: 6, decor: 'meadow', stars: 0,
+      { at: 60, name: '노을 언덕', accent: '#ffc98b', emoji: '🌅', speed: 1.09, gap: 200, interval: 1540, move: 0.2, bg: 'hill', ground: 5, pipe: 6, decor: 'meadow', stars: 0,
         light: 'rgba(255,200,140,', burst: ['#ffb347', '#ffcc80', '#ffffff', '#ff8a65', '#ffe0b2'],
         story: ['바다 너머로 해가 지는 언덕이에요', '소나무 아래 벤치에서 잠깐 쉬어갈까?', '노을빛이 연이의 날개를 물들여요'] },
-      { at: 95, name: '노을 구름', emoji: '☁️', speed: 1.13, gap: 193, interval: 1430, move: 0.28, bg: 'sunset', ground: 2, pipe: 2, decor: 'cacti', stars: 0,
+      { at: 95, name: '노을 구름', accent: '#ffb896', emoji: '☁️', speed: 1.13, gap: 193, interval: 1430, move: 0.28, bg: 'sunset', ground: 2, pipe: 2, decor: 'cacti', stars: 0,
         light: 'rgba(255,190,120,', burst: ['#ffb060', '#ff8040', '#ffd080', '#ffffff', '#ff6030'],
         story: ['솜사탕 같은 구름 위를 달려요!', '연이는 무지개를 찾아 더 높이 날아갑니다', '구름 사이로 보이는 작은 세상이 신기해요'] },
-      { at: 135, name: '달빛 정원', emoji: '🌕', speed: 1.18, gap: 186, interval: 1320, move: 0.35, bg: 'moon', ground: 11, pipe: 11, decor: 'meadow', stars: 0.3,
+      { at: 135, name: '달빛 정원', accent: '#f3dba6', emoji: '🌕', speed: 1.18, gap: 186, interval: 1320, move: 0.35, bg: 'moon', ground: 11, pipe: 11, decor: 'meadow', stars: 0.3,
         light: 'rgba(255,225,170,', burst: ['#ffd27f', '#ffb6c1', '#ffffff', '#f48fb1', '#fff1c1'],
         story: ['보름달이 비추는 꽃 정원에 도착!', '달님에게 소원을 빌어볼까요?', '벚꽃잎이 달빛에 반짝여요'] },
-      { at: 180, name: '오로라 밤', emoji: '🌌', speed: 1.24, gap: 179, interval: 1210, move: 0.42, bg: 'night', overlay: 'aurora', ground: 7, pipe: 7, decor: 'lamps', stars: 0.6,
+      { at: 180, name: '오로라 밤', accent: '#a8f0dc', emoji: '🌌', speed: 1.24, gap: 179, interval: 1210, move: 0.42, bg: 'night', overlay: 'aurora', ground: 7, pipe: 7, decor: 'lamps', stars: 0.6,
         light: 'rgba(160,255,220,', burst: ['#7fffd4', '#40e0d0', '#ffffff', '#b0ffb0', '#80d0ff'],
         story: ['초록빛 오로라가 춤추는 밤하늘!', '가로등 불빛이 연이를 응원해요', '오로라 커튼 사이를 미끄러지듯~'] },
-      { at: 230, name: '하늘 천문대', emoji: '🔭', speed: 1.31, gap: 172, interval: 1100, move: 0.5, bg: 'observatory', ground: 12, pipe: 12, decor: 'lamps', stars: 0.5,
+      { at: 230, name: '하늘 천문대', accent: '#e8c97c', emoji: '🔭', speed: 1.31, gap: 172, interval: 1100, move: 0.5, bg: 'observatory', ground: 12, pipe: 12, decor: 'lamps', stars: 0.5,
         light: 'rgba(255,230,160,', burst: ['#ffd36b', '#7a98e0', '#ffffff', '#c0d0f8', '#ffe9a8'],
         story: ['구름 위에 떠 있는 황금 천문대!', '망원경으로 다음 목적지를 찾아봐요', '별자리 바퀴가 길을 알려줘요'] },
-      { at: 290, name: '우주', emoji: '🚀', speed: 1.40, gap: 164, interval: 980, move: 0.6, bg: 'space', ground: 4, pipe: 4, decor: 'meteors', stars: 0.95, nebula: true,
+      { at: 290, name: '우주', accent: '#cdbcff', emoji: '🚀', speed: 1.40, gap: 164, interval: 980, move: 0.6, bg: 'space', ground: 4, pipe: 4, decor: 'meteors', stars: 0.95, nebula: true,
         light: 'rgba(230,200,255,', burst: ['#d080ff', '#ff80ff', '#ffffff', '#a040ff', '#ff40ff'],
         story: ['우주의 경계를 넘어서는 순간...', '연이는 지구를 바라보며 깜짝 놀라요!', '반짝이는 별들 사이로 자유롭게 여행합니다'] },
-      { at: 360, name: '은하 정원', emoji: '🪐', speed: 1.49, gap: 157, interval: 870, move: 0.68, bg: 'galaxy', ground: 8, pipe: 8, decor: 'meteors', stars: 0.6,
+      { at: 360, name: '은하 정원', accent: '#f5bce8', emoji: '🪐', speed: 1.49, gap: 157, interval: 870, move: 0.68, bg: 'galaxy', ground: 8, pipe: 8, decor: 'meteors', stars: 0.6,
         light: 'rgba(255,190,240,', burst: ['#ff9de2', '#ffd6f5', '#ffffff', '#c084fc', '#7dd3fc'],
         story: ['은하수에 피어난 별꽃 정원이에요', '빛의 물길을 따라 날아가요~', '우주에도 꽃이 핀다는 걸 연이가 증명했어요!'] },
-      { at: 440, name: '일식의 하늘', emoji: '🌑', speed: 1.57, gap: 151, interval: 770, move: 0.75, bg: 'eclipse', ground: 9, pipe: 9, decor: 'meteors', stars: 0.4,
+      { at: 440, name: '일식의 하늘', accent: '#ffb47e', emoji: '🌑', speed: 1.57, gap: 151, interval: 770, move: 0.75, bg: 'eclipse', ground: 9, pipe: 9, decor: 'meteors', stars: 0.4,
         light: 'rgba(255,200,150,', burst: ['#ff5f6d', '#ffc371', '#ffffff', '#b31217', '#ff9a9e'],
         story: ['검은 태양이 떠오른 신비한 하늘', '빛이 사라진 곳에서도 연이는 빛나요', '일식의 고리를 통과해 반대편으로!'] },
-      { at: 540, name: '무한', emoji: '♾️', speed: 1.66, gap: 146, interval: 660, move: 0.8, bg: 'space', overlay: 'rainbow', ground: 10, pipe: 10, decor: 'meteors', stars: 1, nebula: true,
+      { at: 540, name: '무한', accent: '#e9ecff', emoji: '♾️', speed: 1.66, gap: 146, interval: 660, move: 0.8, bg: 'space', overlay: 'rainbow', ground: 10, pipe: 10, decor: 'meteors', stars: 1, nebula: true,
         light: 'rgba(255,255,255,', burst: ['#ffffff', '#d0d0ff', '#ff80ff', '#80ffff', '#ffd700'],
         story: ['무한한 우주 속으로 더 멀리...', '연이는 전설의 우주 돼지가 되어가고 있어요!', '어디까지든 날아갈 수 있을 것만 같아요!'] }
     ];
@@ -4800,7 +4846,7 @@
       }
 
       // 빛나는 텍스트 숫자 (+1)
-      const scoreColor = cloverActive ? '#7fff7f' : cols[0];
+      const scoreColor = cloverActive ? '#9cf5b4' : curStage().accent;
       spawnTextParticle(cloverActive ? '+2!' : '+1', x + 24, y - 20, scoreColor, 17);
     }
 
@@ -4941,8 +4987,11 @@
       const emojiEl = document.getElementById('story-emoji');
       const textEl = document.getElementById('story-text');
 
-      emojiEl.textContent = `${st.emoji} ${lv}단계 · ${st.name}`;
+      emojiEl.textContent = st.name;
       textEl.textContent = story;
+      document.getElementById('story-kicker').textContent = `STAGE ${String(lv).padStart(2, '0')}  ·  ${lv}단계`;
+      document.getElementById('story-icon').textContent = st.emoji;
+      overlay.style.setProperty('--accent', st.accent);
 
       // [성능] 강제 리플로우 없이 애니메이션 재시작 (WAAPI), 연속 레벨업 시 이전 숨김 타이머 취소
       overlay.classList.remove('hidden');
@@ -4959,7 +5008,7 @@
     function spawnLevelUpEffect(lv) {
       // [수정] 레벨 5는 레벨 4와 동일한 우주 색상 사용
       const cols = { [lv]: stageOf(lv).burst[0] };
-      spawnTextParticle(`STAGE ${lv}!`, BASE_W * 0.5, BASE_H * 0.38, cols[lv] || '#ffd700', 26);
+
       
       // [성능 최적화] 객체 풀에서 파티클을 "빌려" 사용
       // 기존: 새 객체를 만들어 배열에 push (메모리 쓰레기 발생)
@@ -5065,8 +5114,8 @@
         ctx.globalAlpha = alpha > 1 ? 1 : alpha;
         switch (p.type) {
           case 'text':
-            ctx.font = `900 ${p.size}px Orbitron, 'Noto Sans KR', sans-serif`;
-            ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(45,20,60,0.7)';
+            ctx.font = `700 ${p.size}px Orbitron, 'Noto Sans KR', sans-serif`;
+            ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(28,14,40,0.62)';
             ctx.strokeText(p.text, p.x, p.y);
             ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
             break;
@@ -5992,7 +6041,7 @@
             // [수정] 고도 속도 - 레벨 4(우주)에서 100km 도달하도록 대폭 증가
             // 레벨 1~3 합산 약 8,400프레임 × 평균 12m/frame ≈ 100,800m
             altitudeSpeed = 8.0 + level * 2.0;
-            spawnTextParticle(`${curStage().emoji} ${curStage().name}!`, BASE_W * 0.5, BASE_H * 0.33, '#ffd700', 22);
+
           }
           setHudScore(true);
 
@@ -6629,6 +6678,8 @@ if (totalLuck >= 80) {
     function setHudStage() {
       const st = curStage();
       $('hud-level').textContent = `${st.emoji} ${level}. ${st.name}`;
+      $('hud-level').style.setProperty('--accent', st.accent);
+      $('hud-progress-bar').style.setProperty('--accent', st.accent);
     }
     function setHudScore(pop) {
       const el = $('hud-score');
