@@ -2015,7 +2015,7 @@
     }
 
     #fade-overlay.dark {
-      background: rgba(0, 0, 0, 0.55);
+      background: rgba(0, 0, 0, 0.32);
     }
 
     .hint {
@@ -4013,7 +4013,16 @@
     function stageOf(lv) { return STAGES[Math.max(1, Math.min(lv, MAX_STAGE)) - 1]; }
     function curStage() { return stageOf(level); }
     // 현재·다음 스테이지 배경 미리 받기
-    function prefetchStageBg(lv) { loadBg(stageOf(lv).bg); if (lv < MAX_STAGE) loadBg(stageOf(lv + 1).bg); }
+    // [성능] 다음 스테이지 배경을 미리 받아 디코딩하고, 한가한 시간에 화면 해상도 캔버스로 합성해 둠
+    //        → 스테이지가 바뀌는 순간 35~100ms 멈칫하던 문제 제거
+    const idle = window.requestIdleCallback ? (fn) => requestIdleCallback(fn, { timeout: 1500 }) : (fn) => setTimeout(fn, 200);
+    function warmStage(lv) {
+      const st = stageOf(lv), img = loadBg(st.bg);
+      const go = () => idle(() => { try { bgCanvas(st); } catch (e) { } });
+      if (img.complete && img.naturalWidth) go();
+      else img.addEventListener('load', () => (img.decode ? img.decode().catch(() => { }) : Promise.resolve()).then(go), { once: true });
+    }
+    function prefetchStageBg(lv) { warmStage(lv); if (lv < MAX_STAGE) warmStage(lv + 1); }
 
     /* ================================================================
        [신규] 난이도 모드 체계 — 새싹 / 꽃잎 / 열정 / 전설
@@ -4161,6 +4170,21 @@
         x.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
         return c;
       }
+      // [버그수정] 윙크/충돌 이미지는 세로로 긴 그림(343x512)인데 가로 70x61 상자에 억지로 넣어
+      // 납작하고 작게 찌그러져 '돼지가 사라진 것'처럼 보였음 → 실제 그림 영역만 잘라 비율 유지
+      const WINK_BOX = [42 / 343, 110 / 512, 279 / 343, 335 / 512];   // 투명 여백 제외한 영역 (비율)
+      const CRASH_BOX = [24 / 343, 35 / 512, 297 / 343, 375 / 512];
+      function fit(img, box) {
+        const nw = img.naturalWidth, nh = img.naturalHeight;
+        const sx = box[0] * nw, sy = box[1] * nh, sw = box[2] * nw, sh = box[3] * nh;
+        const h = H * 1.3, w = h * sw / sh;           // 돼지 키를 일반 비행 프레임과 비슷하게
+        const c = document.createElement('canvas');
+        c.width = Math.ceil(w * R); c.height = Math.ceil(h * R);
+        const x = c.getContext('2d');
+        x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+        x.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+        return { c, w, h };
+      }
       function ready(img) { return img.complete && img.naturalWidth > 0; }
       function ensure() {
         if (!frames.length && ready(pigSprite)) {
@@ -4169,8 +4193,8 @@
             frames.push(cut(pigSprite, (f % SPRITE_COLS) * sw + b, Math.floor(f / SPRITE_COLS) * sh + b, sw - b * 2, sh - b * 2));
           }
         }
-        if (!wink && ready(pigWink)) wink = cut(pigWink, 0, 0, pigWink.naturalWidth, pigWink.naturalHeight);
-        if (!crash && ready(pigCrash)) crash = cut(pigCrash, 0, 0, pigCrash.naturalWidth, pigCrash.naturalHeight);
+        if (!wink && ready(pigWink)) wink = fit(pigWink, WINK_BOX);
+        if (!crash && ready(pigCrash)) crash = fit(pigCrash, CRASH_BOX);
       }
       function build(res) { R = Math.max(1, Math.min(4, res)); frames = []; wink = null; crash = null; }
       /** size: 66 = 게임 내 기본 크기(가로 70px) */
@@ -4186,7 +4210,8 @@
         ctx.translate(x, y);
         if (rot) ctx.rotate(rot);
         if (alpha !== undefined && alpha < 1) ctx.globalAlpha = alpha;
-        if (img) ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        if (img && img.c) ctx.drawImage(img.c, -img.w * size / 132, -img.h * size / 132, img.w * size / 66, img.h * size / 66);
+        else if (img) ctx.drawImage(img, -w / 2, -h / 2, w, h);
         else {
           ctx.fillStyle = '#ffb6c1'; ctx.strokeStyle = '#ff69b4'; ctx.lineWidth = 2;
           ctx.beginPath(); ctx.ellipse(0, 0, w * 0.5, h * 0.45, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -4385,6 +4410,7 @@
     let isMobile = false;
 
     let _yeoniRes = 0;
+    var _dprCap = 0;   // 적응형 해상도 상한 (0 = 제한 없음)
     function resizeCanvas() {
       isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
         (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
@@ -4404,7 +4430,7 @@
 
       scale = Math.min(availW / BASE_W, availH / BASE_H);
       if (isMobile && isLandscape && availW < 600) scale = Math.min(scale, 0.5);
-      dpr = Math.min(window.devicePixelRatio || 1, PERF_CONFIG.maxDpr);
+      dpr = Math.min(window.devicePixelRatio || 1, PERF_CONFIG.maxDpr, _dprCap || 99);
 
       const cssW = Math.floor(BASE_W * scale);
       const cssH = Math.floor(BASE_H * scale);
@@ -4814,9 +4840,10 @@
         p.vy = Math.sin(a) * sp - 0.8;
         p.life = 1;
         p.decay = rand(0.012, 0.022);
-        p.size = rand(10, 24);
-        p.color = `rgba(${rand(20, 45)},${rand(10, 25)},${rand(35, 60)},${rand(0.6, 0.9)})`;
-        p.grow = 1.015;
+        // [버그수정] 진한 불투명 연기가 돼지 위를 덮어 돼지가 사라져 보이던 문제 → 반투명·작게
+        p.size = rand(6, 14);
+        p.color = `rgba(${rand(60, 90) | 0},${rand(30, 50) | 0},${rand(90, 120) | 0},${rand(0.22, 0.38).toFixed(2)})`;
+        p.grow = 1.008;
       }
       
       // 불꽃 파티클
@@ -4917,16 +4944,16 @@
       emojiEl.textContent = `${st.emoji} ${lv}단계 · ${st.name}`;
       textEl.textContent = story;
 
-      // 애니메이션 재설정을 위해 클래스 제거 후 추가
+      // [성능] 강제 리플로우 없이 애니메이션 재시작 (WAAPI), 연속 레벨업 시 이전 숨김 타이머 취소
       overlay.classList.remove('hidden');
       overlay.style.animation = 'none';
-      overlay.offsetHeight; // 리플로우
-      overlay.style.animation = 'storyFadeIn 0.8s ease-out forwards, storyFloat 3s ease-in-out infinite';
-
-      // 4초 후 자동 숨김
-      setTimeout(() => {
-        overlay.classList.add('hidden');
-      }, 4000);
+      overlay.style.opacity = '1';
+      if (overlay.animate) overlay.animate([
+        { opacity: 0, transform: 'translateX(-50%) translateY(20px) scale(0.9)' },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0) scale(1)' }
+      ], { duration: 700, easing: 'cubic-bezier(0.22,1,0.36,1)' });
+      clearTimeout(showStoryOverlay._t);
+      showStoryOverlay._t = setTimeout(() => overlay.classList.add('hidden'), 3600);
     }
 
     function spawnLevelUpEffect(lv) {
@@ -5445,7 +5472,7 @@
       else { dw = BASE_W; dh = dw / ir; dx = 0; dy = (BASE_H - dh) / 2; }
       g.drawImage(img, dx, dy, dw, dh);
       if (tint) { g.fillStyle = tint; g.fillRect(0, 0, BASE_W, BASE_H); }
-      if (_bgCache.size >= 3) _bgCache.delete(_bgCache.keys().next().value);
+      if (_bgCache.size >= 4) _bgCache.delete(_bgCache.keys().next().value);
       _bgCache.set(key, c);
       return c;
     }
@@ -5896,9 +5923,23 @@
         ctx.setLineDash([]);
       }
     }
+    // 오오라 연기 기둥: 위험 영역(기둥 자리) 전체를 은은한 연기로 표시 → 어디를 피해야 하는지 보이게
+    const GLOW_AURA_COLUMN = [[0, 'rgba(150,110,210,0.55)'], [0.55, 'rgba(110,70,170,0.3)'], [1, 'rgba(90,50,150,0)']];
+    const GLOW_CHAOS_COLUMN = [[0, 'rgba(255,110,160,0.5)'], [0.55, 'rgba(200,70,120,0.28)'], [1, 'rgba(160,40,90,0)']];
+    function drawAuraColumn(x, y, h, isChaos, pulse) {
+      if (h <= 4) return;
+      const c = glowSprite(isChaos ? 'chaosCol' : 'auraCol', isChaos ? GLOW_CHAOS_COLUMN : GLOW_AURA_COLUMN);
+      const pa = ctx.globalAlpha;
+      ctx.globalAlpha = pa * (0.75 + pulse * 0.25);
+      ctx.drawImage(c, x - PIPE_W * 0.3, y - 14, PIPE_W * 1.6, h + 28);
+      ctx.globalAlpha = pa;
+    }
     function drawAuraObstacle(x, gapTop, gapBottom, time, isChaos) {
       const groundY = BASE_H - GROUND_H;
       const midX = x + PIPE_W / 2;
+      const pulse = Math.sin(time * 2.2) * 0.5 + 0.5;
+      drawAuraColumn(x, 0, gapTop, isChaos, pulse);
+      drawAuraColumn(x, gapBottom, groundY - gapBottom, isChaos, pulse);
       if (gapTop > 0) drawAuraPart(midX, gapTop / 2, gapTop, isChaos, time);
       if (gapBottom < groundY) drawAuraPart(midX, gapBottom + (groundY - gapBottom) / 2, groundY - gapBottom, isChaos, time);
     }
@@ -6592,7 +6633,8 @@ if (totalLuck >= 80) {
     function setHudScore(pop) {
       const el = $('hud-score');
       el.textContent = score + '%';
-      if (pop) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+      // [성능] 클래스 제거→offsetWidth 읽기→추가 방식은 점수마다 강제 레이아웃을 일으킴 → WAAPI 로 대체
+      if (pop && el.animate) el.animate([{ transform: 'scale(1.22)' }, { transform: 'scale(1)' }], { duration: 260, easing: 'cubic-bezier(0.22,1,0.36,1)' });
       updateHudProgress();
     }
 
@@ -6622,7 +6664,7 @@ if (totalLuck >= 80) {
       if (!el) return;
       if (lockedHint) {
         el.innerHTML = `<span class="mode-detail-lock">🔒 ${d.name} 모드 해금 조건 — <strong>${UNLOCK_RULES[id].hint}</strong> 달성</span>`;
-        el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+        if (el.animate) el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 360 });
         return;
       }
       const best = modeBests[id] || 0;
@@ -6670,6 +6712,7 @@ if (totalLuck >= 80) {
     function cycleQuality() {
       const order = ['auto', 'high', 'saver'];
       qualitySetting = order[(order.indexOf(qualitySetting) + 1) % order.length];
+      _dprCap = 0;
       store.set('pig_quality', qualitySetting);
       resizeCanvas();
       initStars(); initLightParticles(); initGroundDecorations(); initButterflies();
@@ -6682,7 +6725,7 @@ if (totalLuck >= 80) {
       const g = $('go-rank-grade');
       g.textContent = r.grade;
       g.style.setProperty('--rank', r.color);
-      g.classList.remove('stamp'); void g.offsetWidth; g.classList.add('stamp');
+      if (g.animate) g.animate([{ transform: 'scale(2.2) rotate(-12deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 600, delay: 500, easing: 'cubic-bezier(0.22,1,0.36,1)', fill: 'backwards' });
       $('go-rank-title').textContent = r.title;
       $('go-rank-sub').textContent = r.next
         ? `${DIFF.emoji} ${DIFF.name} · 다음 등급 ${r.next.grade}까지 ${Math.ceil(r.toNext / DIFF.rankWeight)}점`
@@ -6779,8 +6822,25 @@ if (totalLuck >= 80) {
     let _needsRedraw = true;      // 일시정지 중 리사이즈 등으로 다시 그려야 할 때
     let _gameOverShown = false;
 
+    // [성능] 적응형 해상도 — 자동 화질에서 2초 평균 프레임이 22ms(≈45fps)를 넘으면 DPR 을 0.25씩 낮춤 (최소 1)
+    let _perfWinStart = 0, _perfWinFrames = 0;
+    function adaptResolution(timestamp) {
+      if (qualitySetting !== 'auto' || gameState !== STATE.PLAYING || document.hidden) { _perfWinStart = 0; return; }
+      if (!_perfWinStart) { _perfWinStart = timestamp; _perfWinFrames = 0; return; }
+      _perfWinFrames++;
+      const span = timestamp - _perfWinStart;
+      if (span < 2000) return;
+      const avg = span / _perfWinFrames;
+      _perfWinStart = 0;
+      if (avg > 22 && dpr > 1.01) {
+        _dprCap = Math.max(1, Math.round((dpr - 0.25) * 4) / 4);
+        resizeCanvas();
+      }
+    }
+
     function gameLoop(timestamp) {
       requestAnimationFrame(gameLoop);
+      adaptResolution(timestamp);
       frameCounter++;
       if (PERF_CONFIG.frameSkip > 1 && frameCounter % PERF_CONFIG.frameSkip !== 0) return;
       // 메뉴/결과 화면 뒤 배경은 30fps 로 충분 → 배터리·발열 절약
@@ -6886,7 +6946,7 @@ if (totalLuck >= 80) {
           return;
         }
         cd.textContent = n;
-        cd.classList.remove('tick'); void cd.offsetWidth; cd.classList.add('tick');
+        if (cd.animate) cd.animate([{ transform: 'scale(1.6)', opacity: 0 }, { opacity: 1, offset: 0.3 }, { transform: 'scale(1)', opacity: 1 }], { duration: 550, easing: 'cubic-bezier(0.22,1,0.36,1)' });
         beep(n === 1 ? 880 : 660, 'sine', 0.08, 0.15);
         n--;
         _countdownTimer = setTimeout(tick, 550);
