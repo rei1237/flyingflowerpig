@@ -93,7 +93,7 @@
       sprites.draw(ctx, E.X, y, 66, p.alive ? Math.max(-0.3, Math.min(0.65, p.vy * 0.06)) : 0.35,
         !p.alive ? 'hurt' : match.elapsed < p.reactionUntil ? 'collect' : 'normal',
         !p.alive ? Math.min(7, hurtAge * 12) : match.elapsed < p.reactionUntil
-          ? Math.min(7.99, (1 - (p.reactionUntil - match.elapsed) / 0.65) * 8) : p.motionPhase, 1, characters[i]);
+          ? Math.min(7.99, (1 - (p.reactionUntil - match.elapsed) / 0.65) * 8) : p.motionPhase, 1, characters[i], Math.max(0, (p.boostUntil - match.elapsed) / 0.38));
       if (p.alive && match.elapsed < p.poisonUntil) { ctx.strokeStyle = '#884091'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(E.X,p.y,24,0,Math.PI*2); ctx.stroke(); }
       const pink = characters[i] === 'yeoni';
       ctx.fillStyle = pink ? '#fff0f5' : '#f3edff'; ctx.strokeStyle = pink ? '#cf91ab' : '#b5a0d3'; ctx.lineWidth = 1.5;

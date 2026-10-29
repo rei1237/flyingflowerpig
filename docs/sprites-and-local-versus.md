@@ -34,3 +34,6 @@
 - 최종 프롬프트: 연이는 실제 어깨축 날개가 수평→상승→최고점→강한 하강→다시 수평으로 순환, 팔은 날개와 분리. 영냥이는 추진구를 뒤/아래로 향해 푸른 분출이 커지며 기수가 들렸다가 다시 수평으로 복귀. 동일한 몸 크기와 중심, 독립 아이템/충돌 행, 깨끗한 알파 배경. 생성 후 기계적 분리/여백 정렬을 수행한다.
 - 반복 입력으로 모션을 첫 프레임에 강제 이동시키지 않는다. 날갯짓/추진 주기는 이어가며 점프 직후 재생 속도만 높인다. 기존 피격 범위·물리·70px 표시 상자와 아이템 획득 때만 반응하는 규칙 유지.
 - 검증: 단위14개 통과. 브라우저 효과음/음소거, 개별키·동시터치, 아이템/장애물 반응 분리,4화면크기 통과. 별도 신화8단계 QA에서 움직이는 오오라·우주 배경·획득 효과음 확인. 실제 휴대폰 하드웨어 음량/스피커는 미검증.
+
+## 2026-10-29 mobile propulsion and character selection
+Shared renderer adds a three-layer cyan jet inside the existing draw envelope. Solo uses flapBoost; versus uses the remaining 0.38s boost envelope. No character scaling or collision changes. Pickup/hurt frames suppress the jet. Selection cards show flight style, selected state, and live 1P/2P assignments. v7 service-worker cache refreshes the changed renderer and UI. Validated 320/390/1280px selection and existing four-viewport browser suite.

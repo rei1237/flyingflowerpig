@@ -3719,11 +3719,12 @@
           <div class="menu-tagline">어둠의 액운을 피해<br>아름다운 <strong>우주</strong>를 향한 연이와 영냥이의 여정 🌸✨</div>
 
           <fieldset class="character-choice">
-            <legend>1P 캐릭터 선택</legend>
+            <legend>함께 날 친구</legend>
             <div class="character-options">
-              <button type="button" data-character="yeoni" aria-pressed="true"><img src="./assets/sprites/yeoni-portrait-v3.webp" alt="" width="56" height="56"><span>꽃돼지 연이</span></button>
-              <button type="button" data-character="yeongnyangi" aria-pressed="false"><img src="./assets/sprites/yeongnyangi-portrait-v3.webp" alt="" width="56" height="56"><span>영냥이</span></button>
+              <button type="button" data-character="yeoni" aria-pressed="true"><img src="./assets/sprites/yeoni-portrait-v3.webp" alt="" width="56" height="56"><span class="character-copy"><strong>연이</strong><small>사뿐사뿐 날개짓</small></span><span class="character-selected" aria-hidden="true">선택</span></button>
+              <button type="button" data-character="yeongnyangi" aria-pressed="false"><img src="./assets/sprites/yeongnyangi-portrait-v3.webp" alt="" width="56" height="56"><span class="character-copy"><strong>영냥이</strong><small>슝! 하늘 오토바이</small></span><span class="character-selected" aria-hidden="true">선택</span></button>
             </div>
+            <p class="character-assignment" id="character-assignment" aria-live="polite">1P 연이 · 2P 영냥이</p>
           </fieldset>
           <!-- ── 난이도 선택 ── -->
           <div class="mode-section">
@@ -5790,7 +5791,7 @@
       const animationFrame = expressionNow < pigExprUntil && ['happy', 'love', 'wink'].includes(expression)
         ? Math.min(7.99, (expressionNow - pigExprStarted) / (pigExprUntil - pigExprStarted) * 8)
         : expression === 'hurt' ? Math.min(7.99, Math.max(0, (Date.now() - crashEnd + CRASH_DURATION) / 150)) : wf;
-      Yeoni.draw(ctx, bx, by + floatY, PIG_DRAW_SIZE, bird.rotation, expression, animationFrame);
+      Yeoni.draw(ctx, bx, by + floatY, PIG_DRAW_SIZE, bird.rotation, expression, animationFrame, 1, Yeoni.selected, bird.flapBoost);
 
       if (boltActive) {
         drawGlow('cyan', GLOW.cyan, bx, by, bw * 0.85, 0.9);
@@ -7089,10 +7090,11 @@ if (totalLuck >= 80) {
       document.getElementById('btn-versus').disabled = false;
       document.getElementById('sprite-status').textContent = '';
     }).catch(error => { document.getElementById('sprite-status').textContent = error.message; });
-    document.querySelectorAll('[data-character]').forEach(button => {
+    document.querySelectorAll('.character-options [data-character]').forEach(button => {
       button.addEventListener('click', () => {
         window.FlyingSprites.select(button.dataset.character);
-        document.querySelectorAll('[data-character]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+        document.getElementById('character-assignment').textContent = button.dataset.character === 'yeoni' ? '1P 연이 · 2P 영냥이' : '1P 영냥이 · 2P 연이';
+        document.querySelectorAll('.character-options [data-character]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
         document.querySelectorAll('.menu-character-img, .mini-avatar').forEach(img => {
           img.src = `./assets/sprites/${button.dataset.character}-portrait-v3.webp`;
           img.alt = window.FlyingSprites.manifest[button.dataset.character].name;

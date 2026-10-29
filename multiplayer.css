@@ -1,10 +1,17 @@
-.character-choice { border: 0; margin: 16px 0; padding: 0; text-align: left; }
+.character-choice { border: 0; margin: 16px 0; padding: 0; text-align: left; min-width: 0; }
 .character-choice legend { color: #f8e3f2; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
-.character-options { display: flex; gap: 8px; }
-.character-options button { flex: 1; min-height: 72px; border: 2px solid #b9a5c8; border-radius: 14px; background: #fff9fc; color: #483359; font: inherit; cursor: pointer; padding: 7px; }
-.character-options button[aria-pressed="true"] { border-color: #764481; background: #f5e2ef; }
-.character-options img { width: 56px; height: 56px; vertical-align: middle; object-fit: contain; }
-.character-options span { display: inline-block; font-size: 14px; font-weight: 700; }
+.character-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.character-options button { position: relative; display: flex; align-items: center; gap: 5px; min-height: 92px; border: 2px solid #d5c8db; border-radius: 16px; background: #fff9fc; color: #483359; font: inherit; cursor: pointer; padding: 10px 6px 18px; text-align: left; }
+.character-options button[aria-pressed="true"] { border-color: #864a79; background: #f7e5ef; box-shadow: 0 3px 9px #29153126; }
+.character-options button[data-character="yeongnyangi"][aria-pressed="true"] { border-color: #65508a; background: #eee7f9; }
+.character-options img { width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; }
+.character-copy { min-width: 0; }
+.character-copy strong { display: block; font-size: 15px; }
+.character-copy small { display: block; font-size: 10px; line-height: 1.5; color: #695374; word-break: keep-all; }
+.character-selected { position: absolute; bottom: 4px; right: 9px; font-size: 10px; font-weight: 700; visibility: hidden; }
+[aria-pressed="true"] > .character-selected { visibility: visible; }
+.character-assignment { margin: 7px 0 0; text-align: center; color: #f8e3f2; font-size: 12px; }
+.character-options button:active { border-color: #483359; }
 #btn-versus { margin-top: 10px; width: 100%; min-height: 48px; background: #503d68; color: #fff7fd; border: 1px solid #7b6592; }
 .vs-hint { color: #f2d7e9; font-size: 12px; line-height: 1.6; margin: 8px 0; }
 .sprite-status { color: #ffe0e9; font-size: 13px; line-height: 1.5; }
