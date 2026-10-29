@@ -3,7 +3,7 @@
  * 캐싱 및 오프라인 지원
  */
 
-const CACHE_NAME = 'flying-flower-pig-v7-propulsion';
+const CACHE_NAME = 'flying-flower-pig-v8-yeoni';
 // 스테이지 배경은 처음 쓰일 때 런타임 캐시에 저장 (첫 설치 데이터 절약)
 const STATIC_ASSETS = [
   '/',
@@ -13,9 +13,9 @@ const STATIC_ASSETS = [
   '/versus-engine.js',
   '/versus-ui.js',
   '/multiplayer.css',
-  '/assets/sprites/yeoni-v3.webp',
+  '/assets/sprites/yeoni-v4.webp',
   '/assets/sprites/yeongnyangi-v3.webp',
-  '/assets/sprites/yeoni-portrait-v3.webp',
+  '/assets/sprites/yeoni-portrait-v4.webp',
   '/assets/sprites/yeongnyangi-portrait-v3.webp',
   '/sky-day.webp',
   '/icon-192.png',

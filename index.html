@@ -29,7 +29,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="image" href="./sky-day.webp" type="image/webp" />
-  <link rel="preload" as="image" href="./assets/sprites/yeoni-v3.webp" type="image/webp" />
+  <link rel="preload" as="image" href="./assets/sprites/yeoni-v4.webp" type="image/webp" />
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Gowun+Batang:wght@700&family=Nanum+Pen+Script&display=swap"
     rel="stylesheet" />
@@ -3700,7 +3700,7 @@
         <!-- [신규] 접힌 상태용 미니 프로필 패널 -->
         <div class="mini-profile" id="mini-profile">
           <div class="mini-profile-inner">
-            <img src="./assets/sprites/yeoni-portrait-v3.webp" width="343" height="512" decoding="async" alt="연이" class="mini-avatar" onerror="this.style.display='none'">
+            <img src="./assets/sprites/yeoni-portrait-v4.webp" width="343" height="512" decoding="async" alt="연이" class="mini-avatar" onerror="this.style.display='none'">
             <div class="mini-info">
               <div class="mini-name">🐷 꽃돼지 연이</div>
               <div class="mini-story" id="mini-story">우주를 향한 꿈을 안고...</div>
@@ -3714,14 +3714,14 @@
           <div class="title-sub">액운을 피해 우주로!</div>
           <!-- [신규] 캐릭터 이미지 영역 -->
           <div class="menu-character-wrap">
-            <img src="./assets/sprites/yeoni-portrait-v3.webp" width="343" height="512" decoding="async" alt="꽃돼지 연이" class="menu-character-img" onerror="this.style.display='none'">
+            <img src="./assets/sprites/yeoni-portrait-v4.webp" width="343" height="512" decoding="async" alt="꽃돼지 연이" class="menu-character-img" onerror="this.style.display='none'">
           </div>
           <div class="menu-tagline">어둠의 액운을 피해<br>아름다운 <strong>우주</strong>를 향한 연이와 영냥이의 여정 🌸✨</div>
 
           <fieldset class="character-choice">
             <legend>함께 날 친구</legend>
             <div class="character-options">
-              <button type="button" data-character="yeoni" aria-pressed="true"><img src="./assets/sprites/yeoni-portrait-v3.webp" alt="" width="56" height="56"><span class="character-copy"><strong>연이</strong><small>사뿐사뿐 날개짓</small></span><span class="character-selected" aria-hidden="true">선택</span></button>
+              <button type="button" data-character="yeoni" aria-pressed="true"><img src="./assets/sprites/yeoni-portrait-v4.webp" alt="" width="56" height="56"><span class="character-copy"><strong>연이</strong><small>사뿐사뿐 날개짓</small></span><span class="character-selected" aria-hidden="true">선택</span></button>
               <button type="button" data-character="yeongnyangi" aria-pressed="false"><img src="./assets/sprites/yeongnyangi-portrait-v3.webp" alt="" width="56" height="56"><span class="character-copy"><strong>영냥이</strong><small>슝! 하늘 오토바이</small></span><span class="character-selected" aria-hidden="true">선택</span></button>
             </div>
             <p class="character-assignment" id="character-assignment" aria-live="polite">1P 연이 · 2P 영냥이</p>
@@ -7096,7 +7096,7 @@ if (totalLuck >= 80) {
         document.getElementById('character-assignment').textContent = button.dataset.character === 'yeoni' ? '1P 연이 · 2P 영냥이' : '1P 영냥이 · 2P 연이';
         document.querySelectorAll('.character-options [data-character]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
         document.querySelectorAll('.menu-character-img, .mini-avatar').forEach(img => {
-          img.src = `./assets/sprites/${button.dataset.character}-portrait-v3.webp`;
+          img.src = `./assets/sprites/${button.dataset.character}-portrait-${button.dataset.character === 'yeoni' ? 'v4' : 'v3'}.webp`;
           img.alt = window.FlyingSprites.manifest[button.dataset.character].name;
         });
         document.querySelector('.mini-name').textContent = window.FlyingSprites.manifest[button.dataset.character].name;

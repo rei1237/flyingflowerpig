@@ -14,7 +14,7 @@ test('sprite frames preserve size and separate flight, pickup and impact rows',a
 test('page inline scripts parse and local assets exist',()=>{
  const html=fs.readFileSync('index.html','utf8');
  for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(m[1]);
- for(const f of ['sprites.js','versus-engine.js','versus-ui.js','multiplayer.css','assets/sprites/yeoni-v3.webp','assets/sprites/yeongnyangi-v3.webp'])assert.ok(fs.existsSync(f),f);
+ for(const f of ['sprites.js','versus-engine.js','versus-ui.js','multiplayer.css','assets/sprites/yeoni-v4.webp','assets/sprites/yeongnyangi-v3.webp'])assert.ok(fs.existsSync(f),f);
 });
 
 test('cat thrust grows on input without changing sprite size or leaking into reactions',async()=>{

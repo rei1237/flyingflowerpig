@@ -37,3 +37,6 @@
 
 ## 2026-10-29 mobile propulsion and character selection
 Shared renderer adds a three-layer cyan jet inside the existing draw envelope. Solo uses flapBoost; versus uses the remaining 0.38s boost envelope. No character scaling or collision changes. Pickup/hurt frames suppress the jet. Selection cards show flight style, selected state, and live 1P/2P assignments. v7 service-worker cache refreshes the changed renderer and UI. Validated 320/390/1280px selection and existing four-viewport browser suite.
+
+## Yeoni reference-faithful redraw v4
+Built-in image_gen; official reference D:/CodeDestiny-Build/연이 프로필1.png. Source: docs/art-source/yeoni-v4.png. Prompt: regenerate a transparent 4x6 full-body sprite sheet faithful to official Yeoni: small cocoa bead eyes, tiny short snout, sweet closed smile, pale blush round pig body, short limbs, pink lotus, lavender scarf, small shoulder wings. Slightly upright floating right-facing three-quarter view, consistent scale, 16 wingbeat/4 pickup/4 hurt frames. Normal flight excludes all closed-eye celebration frames; rows 1–3 plus a reverse downstroke make the flight loop. Original 70px drawing and collision geometry unchanged; cat v3 and thrust retained.

@@ -1,7 +1,7 @@
 // Mechanical alpha-component extraction and atlas packing; never crop at assumed grid lines.
 const sharp = require(process.env.SHARP_MODULE || 'sharp');
 const fs = require('node:fs');
-async function pack(input, key) {
+async function pack(input, key, version = 'v3', sequential = false) {
  const {data,info}=await sharp(input).ensureAlpha().raw().toBuffer({resolveWithObject:true});
  const {width:w,height:h}=info, ids=new Int32Array(w*h), queue=new Int32Array(w*h), components=[];
  let id=0;
@@ -21,7 +21,7 @@ async function pack(input, key) {
  if(bodies.length!==24)throw Error(`Expected 24 isolated characters, found ${bodies.length}`);
  const ordered=[];for(let row=0;row<6;row++)ordered.push(...bodies.slice(row*4,row*4+4).sort((a,b)=>a.cx-b.cx));
  // Rows 1–3 form the wingbeat; reverse the downstroke to return smoothly without celebration frames.
- const order=key==='yeoni'?[0,1,2,4,4,5,6,6,8,9,10,11,10,9,8,6,16,17,18,19,20,21,22,23]:Array.from({length:24},(_,i)=>i);
+ const order=sequential?[0,1,2,3,4,5,6,7,8,9,10,11,10,9,8,4,16,17,18,19,20,21,22,23]:key==='yeoni'?[0,1,2,4,4,5,6,6,8,9,10,11,10,9,8,6,16,17,18,19,20,21,22,23]:Array.from({length:24},(_,i)=>i);
  const sources=order.map(i=>ordered[i]);
  const span=Math.max(...sources.map(c=>2*Math.max(c.cx-c.x0,c.x1-c.cx,c.cy-c.y0,c.y1-c.cy)+10));
  const scale=216/span, layers=[], report=[];
@@ -45,9 +45,9 @@ async function pack(input, key) {
  }
  const atlas=sharp({create:{width:1024,height:1536,channels:4,background:{r:0,g:0,b:0,alpha:0}}}).composite(layers);
  const png=await atlas.png().toBuffer();
- await sharp(png).webp({lossless:true}).toFile(`assets/sprites/${key}-v3.webp`);
- await sharp(png).extract({left:0,top:0,width:256,height:256}).webp({lossless:true}).toFile(`assets/sprites/${key}-portrait-v3.webp`);
- fs.writeFileSync(`assets/sprites/${key}-v3.json`,JSON.stringify({size:[1024,1536],cell:256,alphaThreshold:32,frames:report},null,2)+'\n');
+ await sharp(png).webp({lossless:true}).toFile(`assets/sprites/${key}-${version}.webp`);
+ await sharp(png).extract({left:0,top:0,width:256,height:256}).webp({lossless:true}).toFile(`assets/sprites/${key}-portrait-${version}.webp`);
+ fs.writeFileSync(`assets/sprites/${key}-${version}.json`,JSON.stringify({size:[1024,1536],cell:256,alphaThreshold:32,frames:report},null,2)+'\n');
  console.log(key,'packed 24 frames with clear gutters; scale',scale);
 }
-(async()=>{await pack(process.argv[2],'yeoni');await pack(process.argv[3],'yeongnyangi');})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{if(process.argv[2]==='--yeoni-v4'){await pack(process.argv[3],'yeoni','v4',true);}else{await pack(process.argv[2],'yeoni');await pack(process.argv[3],'yeongnyangi');}})().catch(e=>{console.error(e);process.exitCode=1});
