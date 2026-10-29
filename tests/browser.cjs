@@ -9,6 +9,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   page.on('pageerror', e=>errors.push(e.message));
   await page.goto(process.env.GAME_URL || 'http://127.0.0.1:5374/');
   await page.locator('#btn-start:enabled').waitFor();
+  const alphaCheck=await page.evaluate(async()=>{
+   const report=[];
+   for(const spec of Object.values(FlyingSprites.manifest)){
+    const image=new Image();image.src=spec.src;await image.decode();
+    const c=document.createElement('canvas');c.width=image.width;c.height=image.height;const g=c.getContext('2d');g.drawImage(image,0,0);const pixels=g.getImageData(0,0,c.width,c.height).data;
+    let bad=0;for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++)if((x%256<12||x%256>=244||y%256<12||y%256>=244)&&pixels[(y*c.width+x)*4+3])bad++;
+    report.push({name:spec.name,bad});
+   }return report;
+  });assert.ok(alphaCheck.every(r=>r.bad===0));
   const mechanics=await page.evaluate(()=>{
    startGame(); gameState=STATE.PLAYING; pigExpr='normal';pigExprUntil=0;
    spawnPipe(performance.now()); const pipe=pipePool.getActive()[0];
@@ -26,18 +35,24 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   assert.equal(await page.evaluate(()=>FlyingSprites.selected),'yeongnyangi');
   await page.evaluate(()=>goToMenu());
   // Observe engine state through its public step function; no production debug bypass.
-  await page.evaluate(()=>{const step=FlyingMatch.step;FlyingMatch.step=m=>{step(m);window.qaMatch=m;};});
+  await page.evaluate(()=>{const step=FlyingMatch.step;FlyingMatch.step=m=>{step(m);window.qaMatch=m;};window.qaSounds=[];const originalBeep=beep;beep=(...args)=>{window.qaSounds.push(args);originalBeep(...args)};});
   await page.locator('#btn-versus').click();await page.locator('#versus-action').click();
   await page.waitForFunction(()=>window.qaMatch?.tick>0);
   await page.keyboard.press('KeyW');
   const separate=await page.evaluate(()=>qaMatch.players.map(p=>p.vy));assert.ok(separate[0]<0&&separate[1]>=0);
+  assert.ok(await page.evaluate(()=>qaSounds.length>0));
+  await page.locator('#versus-sound').click();
+  const soundCount=await page.evaluate(()=>qaSounds.length);
   await page.keyboard.press('ArrowUp');
+  assert.equal(await page.evaluate(()=>qaSounds.length),soundCount);
+  await page.locator('#versus-sound').click();
   assert.ok(await page.evaluate(()=>qaMatch.players[1].vy<0));
   await page.screenshot({path:path.resolve('docs/versus-desktop.png')});
   await page.locator('#versus-pause').click();const tick=await page.evaluate(()=>qaMatch.tick);
   await page.waitForTimeout(250);assert.equal(await page.evaluate(()=>qaMatch.tick),tick);
   await page.locator('#versus-action').click();
   await page.waitForFunction(()=>window.qaMatch.finished,{},{timeout:10000});
+  assert.ok(await page.evaluate(()=>qaSounds.some(args=>args[0]===160)));
   const previousSeed=await page.evaluate(()=>qaMatch.seed);
   await page.locator('#versus-action').click();
   await page.waitForFunction(()=>!window.qaMatch.finished,{},{timeout:6000});
@@ -65,6 +80,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
    assert.ok(boxes.every(b=>b.h>=44&&b.x>=0&&b.b<=size.height));
   }
   await mobile.close();assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({passed:true,mechanics,separateKeyboard:true,simultaneousTouch:velocities,pause:true,replaySameSeed:true,viewports:['1280x800','390x844','320x568','844x390'],pageErrors:errors}));
+  console.log(JSON.stringify({passed:true,alphaCheck,effectsAndMute:true,mechanics,separateKeyboard:true,simultaneousTouch:velocities,pause:true,replaySameSeed:true,viewports:['1280x800','390x844','320x568','844x390'],pageErrors:errors}));
  } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

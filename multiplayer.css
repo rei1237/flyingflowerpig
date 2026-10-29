@@ -33,3 +33,5 @@
 @media(max-width: 420px) { #versus-screen .vs-controls button { gap: 5px; font-size: 20px; padding: 6px; } .vs-player-badge { width: 28px; height: 28px; font-size: 18px; } }
 .vs-rules { font-size: 12px; margin: 6px 0 0; text-align: center; line-height: 1.4; }
 @media (max-height: 440px) { .vs-toolbar h1 { font-size: 15px; } .vs-rules { display: none; } #versus-status { margin: 2px; } .vs-controls { position: absolute; bottom: 8px; width: calc(100% - 16px); pointer-events: none; } .vs-controls button { flex: 0 1 110px; pointer-events: auto; } .vs-controls button:last-child { margin-left: auto; } }
+
+@media(max-width: 600px) { .vs-toolbar { flex-wrap: wrap; justify-content: center; gap: 6px; } #versus-screen .vs-toolbar h1 { flex-basis: 100%; text-align: center; font-size: 25px; } #versus-status { text-align: center; font-size: 11px; } }

@@ -43,3 +43,32 @@ test('2P keeps original solo hitbox formulas for every difficulty',()=>{
   assert.equal(c.boundaryHalfHeight,(70/1.15)*.32);
  }
 });
+test('stage and difficulty control speed, gap, cadence and moving obstacles',()=>{
+ const stages=[{at:0,name:'test',gap:220,interval:1800,speed:1,move:1,pipe:1},{at:1,name:'next',gap:180,interval:1000,speed:1.5,move:1,pipe:2}];
+ const m=E.createMatch(9,{gapScale:.8,speedScale:1.2,intervalScale:.7,moveScale:2},stages);
+ E.spawnGate(m);const gate=m.gates[0],before=gate.x;assert.equal(gate.gap,176);assert.ok(gate.moving);
+ m.nextGate=999;E.step(m);assert.ok(Math.abs(before-gate.x-3.6)<1e-8);assert.notEqual(gate.center,gate.baseCenter);
+ m.progress=1;E.step(m);assert.equal(m.stageIndex,1);assert.equal(m.config.gap,144);assert.ok(m.events.some(e=>e.type==='stage'));
+});
+test('aura difficulty threshold and pickup frequency are applied',()=>{
+ const stage={at:0,name:'space',gap:200,interval:1800,speed:1,move:0,pipe:8};
+ const easy=E.createMatch(12,{auraFrom:99,itemRate:1},[stage]);easy.random=()=>.1;E.spawnGate(easy);assert.equal(easy.gates[0].aura,false);assert.equal(easy.gates[0].gem,true);
+ const hard=E.createMatch(12,{auraFrom:1,itemRate:0},[stage]);hard.random=()=>.1;E.spawnGate(hard);assert.equal(hard.gates[0].aura,true);assert.equal(hard.gates[0].gem,false);
+});
+test('item effects belong only to the collecting player and emit one sound event',()=>{
+ for(const type of ['lotus','clover','bolt','coin']){
+  const m=E.createMatch(4);m.nextGate=999;m.players[1].y=500;
+  m.gates=[{x:E.X,center:282,gap:600,gem:true,itemType:type,passed:[false,false],taken:[false,false]}];
+  E.step(m);assert.equal(m.players[0].collected,1);assert.equal(m.players[1].collected,0);
+  assert.equal(m.events.filter(e=>e.type==='collect').length,1);
+  assert.equal(m.players[1].reactionUntil,0);
+  if(type==='lotus')assert.ok(E.protectedPlayer(m,m.players[0]));
+  if(type==='clover')assert.ok(m.players[0].cloverUntil>m.elapsed);
+  if(type==='bolt')assert.ok(m.players[0].boltUntil>m.elapsed);
+  E.step(m);assert.equal(m.events.filter(e=>e.type==='collect').length,0);
+ }
+});
+test('jump accelerates a continuous flight cycle without triggering pickup animation',()=>{
+ const m=E.createMatch(1);m.players[0].motionPhase=13;assert.equal(E.flap(m,0),true);
+ assert.equal(m.players[0].motionPhase,13);assert.equal(m.players[0].reactionUntil,0);assert.ok(m.players[0].boostUntil>0);
+});

@@ -29,7 +29,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="image" href="./sky-day.webp" type="image/webp" />
-  <link rel="preload" as="image" href="./assets/sprites/yeoni-v2.webp" type="image/webp" />
+  <link rel="preload" as="image" href="./assets/sprites/yeoni-v3.webp" type="image/webp" />
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Gowun+Batang:wght@700&family=Nanum+Pen+Script&display=swap"
     rel="stylesheet" />
@@ -3700,7 +3700,7 @@
         <!-- [신규] 접힌 상태용 미니 프로필 패널 -->
         <div class="mini-profile" id="mini-profile">
           <div class="mini-profile-inner">
-            <img src="./assets/sprites/yeoni-portrait-v2.webp" width="343" height="512" decoding="async" alt="연이" class="mini-avatar" onerror="this.style.display='none'">
+            <img src="./assets/sprites/yeoni-portrait-v3.webp" width="343" height="512" decoding="async" alt="연이" class="mini-avatar" onerror="this.style.display='none'">
             <div class="mini-info">
               <div class="mini-name">🐷 꽃돼지 연이</div>
               <div class="mini-story" id="mini-story">우주를 향한 꿈을 안고...</div>
@@ -3714,15 +3714,15 @@
           <div class="title-sub">액운을 피해 우주로!</div>
           <!-- [신규] 캐릭터 이미지 영역 -->
           <div class="menu-character-wrap">
-            <img src="./assets/sprites/yeoni-portrait-v2.webp" width="343" height="512" decoding="async" alt="꽃돼지 연이" class="menu-character-img" onerror="this.style.display='none'">
+            <img src="./assets/sprites/yeoni-portrait-v3.webp" width="343" height="512" decoding="async" alt="꽃돼지 연이" class="menu-character-img" onerror="this.style.display='none'">
           </div>
           <div class="menu-tagline">어둠의 액운을 피해<br>아름다운 <strong>우주</strong>를 향한 연이와 영냥이의 여정 🌸✨</div>
 
           <fieldset class="character-choice">
             <legend>1P 캐릭터 선택</legend>
             <div class="character-options">
-              <button type="button" data-character="yeoni" aria-pressed="true"><img src="./assets/sprites/yeoni-portrait-v2.webp" alt="" width="56" height="56"><span>꽃돼지 연이</span></button>
-              <button type="button" data-character="yeongnyangi" aria-pressed="false"><img src="./assets/sprites/yeongnyangi-portrait-v2.webp" alt="" width="56" height="56"><span>영냥이</span></button>
+              <button type="button" data-character="yeoni" aria-pressed="true"><img src="./assets/sprites/yeoni-portrait-v3.webp" alt="" width="56" height="56"><span>꽃돼지 연이</span></button>
+              <button type="button" data-character="yeongnyangi" aria-pressed="false"><img src="./assets/sprites/yeongnyangi-portrait-v3.webp" alt="" width="56" height="56"><span>영냥이</span></button>
             </div>
           </fieldset>
           <!-- ── 난이도 선택 ── -->
@@ -3955,7 +3955,7 @@
   </div>
 
   <section id="versus-screen" hidden aria-label="로컬 2P 대전">
-    <header class="vs-toolbar"><h1>날아라 꽃돼지 · 2P VS</h1><button type="button" id="versus-pause">일시정지</button><button type="button" id="versus-exit">메인으로</button></header>
+    <header class="vs-toolbar"><h1>날아라 꽃돼지 · 2P VS</h1><button type="button" id="versus-sound" aria-pressed="true">효과음 켜짐</button><button type="button" id="versus-pause">일시정지</button><button type="button" id="versus-exit">메인으로</button></header>
     <p id="versus-status" role="status" aria-live="polite"></p>
     <div class="vs-board">
       <canvas id="versus-canvas" width="640" height="640" aria-label="왼쪽 1P, 오른쪽 2P의 같은 비행 코스"></canvas>
@@ -7094,7 +7094,7 @@ if (totalLuck >= 80) {
         window.FlyingSprites.select(button.dataset.character);
         document.querySelectorAll('[data-character]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
         document.querySelectorAll('.menu-character-img, .mini-avatar').forEach(img => {
-          img.src = `./assets/sprites/${button.dataset.character}-portrait-v2.webp`;
+          img.src = `./assets/sprites/${button.dataset.character}-portrait-v3.webp`;
           img.alt = window.FlyingSprites.manifest[button.dataset.character].name;
         });
         document.querySelector('.mini-name').textContent = window.FlyingSprites.manifest[button.dataset.character].name;
@@ -7104,7 +7104,8 @@ if (totalLuck >= 80) {
       if (!spritesReady) return;
       initAudio(); pauseBGM();
       document.getElementById('screen-menu').classList.add('hidden');
-      window.FlyingVersus.start({ difficulty: DIFF, onExit: goToMenu, onPause: pauseBGM, onResume: playBGM });
+      window.FlyingVersus.start({ difficulty: DIFF, onExit: goToMenu, onPause: pauseBGM, onResume: playBGM, stages: STAGES, themes: PIPE_THEMES, background: loadBg,
+        onSound: (type) => { ({jump:sndJump,score:sndScore,hit:sndHit,coin:sndCoin,lotus:sndLotus,clover:sndClover,bolt:sndBolt,poison:sndHit,stage:sndLotus})[type]?.(); } });
     });
     document.getElementById('btn-start').addEventListener('click', () => {
       if (!spritesReady) return;

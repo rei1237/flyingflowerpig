@@ -1,8 +1,8 @@
 (function (root) {
   'use strict';
   const manifest = {
-    yeoni: { name: '꽃돼지 연이', src: './assets/sprites/yeoni-v2.webp' },
-    yeongnyangi: { name: '영냥이', src: './assets/sprites/yeongnyangi-v2.webp' }
+    yeoni: { name: '꽃돼지 연이', src: './assets/sprites/yeoni-v3.webp' },
+    yeongnyangi: { name: '영냥이', src: './assets/sprites/yeongnyangi-v3.webp' }
   };
   const images = {};
   let selected = 'yeoni';
